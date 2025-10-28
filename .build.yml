@@ -12,11 +12,16 @@ sources:
   - https://git.sr.ht/~gheartsfield/a2x/
 shell: false
 tasks:
-  - build: |
+  - setup: |
       cargo install cargo-auditable cargo-audit cargo-cyclonedx
+  - build: |
       cd a2x
       cargo auditable build --release --locked
+  - sbom: |
+      cd a2x
       cargo-cyclonedx cyclonedx
+  - audit: |
+      cd a2x
       cargo audit bin target/release/a2x
   - test: |
       cd a2x
