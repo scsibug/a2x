@@ -1,6 +1,6 @@
 ALFA to XACML (a2x)
 -------------------
-[![builds.sr.ht status](https://builds.sr.ht/~gheartsfield/a2x.svg?search=tags:master)](https://builds.sr.ht/~gheartsfield/a2x?search=tags%3Amaster)
+[![builds.sr.ht status](https://builds.sr.ht/~gheartsfield/a2x/commits/master.svg)](https://builds.sr.ht/~gheartsfield/a2x/commits/master?)
 
 a2x converts policies written in the ALFA language to XACML 3.0 XML
 policies.
