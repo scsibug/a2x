@@ -1,0 +1,23 @@
+image: fedora/latest
+arch: x86_64
+artifacts:
+  - a2x/target/release/a2x
+  - a2x/a2x.cdx.xml
+environment:
+  RUST_LOG: info
+  PATH: "/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/build/.cargo/bin"
+packages:
+  - cargo
+sources:
+  - https://git.sr.ht/~gheartsfield/a2x/
+shell: false
+tasks:
+  - build: |
+      cargo install cargo-auditable cargo-audit cargo-cyclonedx
+      cd a2x
+      cargo auditable build --release --locked
+      cargo-cyclonedx cyclonedx
+      cargo audit bin target/release/a2x
+  - test: |
+      cd a2x
+      cargo test --release
