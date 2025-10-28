@@ -63,6 +63,12 @@ To run all these tests, use:
 $ cargo test
 ```
 
+### Sample ALFA policy
+
+A [sample policy](samples/retail/README.md) is included in this
+repository, which may be helpful as a reference for ALFA language
+features, and a known working example for running `a2x`.
+
 ### References
 
 * [XACML
@@ -70,4 +76,5 @@ $ cargo test
   the OASIS specification for eXtensible Access Control Markup
   Language.
 * [ALFA 1.0](https://groups.oasis-open.org/higherlogic/ws/public/download/55228/alfa-for-xacml-v1.0-wd01.doc) - the OASIS draft specification for ALFA (Word format)
+* [ALFA Guide](https://alfa.guide/) - many resources for learning and using ALFA
 * [ALFA 2.0](https://www.ietf.org/archive/id/draft-brossard-alfa-authz-00.html) - future evolution of the ALFA language
