@@ -15,7 +15,7 @@ mod common;
 // Here we focus on policysets that have conditions.
 
 #[test]
-fn policy_condition() {
+fn policyset_condition() {
     let x = compile_alfa_src(
         r#"
 namespace main {

@@ -98,3 +98,38 @@ namespace main {
         "original policy effect is preserved"
     );
 }
+
+// If referencing a policy with a condition from a policyset, ensure
+// that the child entry in the policyset is referenced with
+// PolicySetId, not PolicyId.
+#[test]
+fn policyset_policy_ref() {
+    let x = compile_alfa_src(
+        r#"
+namespace main {
+  policyset a = "a" {
+    apply firstApplicable
+    c
+  }
+  // this will be de-conditioned and transformed into a policyset
+  policy c = "will-become-a-policyset" {
+    apply firstApplicable
+    condition subjectId == "sub-test"
+  }
+}
+"#,
+    );
+    // should have 2 policy files
+    assert_eq!(x.len(), 2);
+    // the first is our policyset (a)
+    let p = get_nth_policyset(0, x);
+    assert_eq!(p.id, "a");
+    // there is one child reference, and it is a policyset.
+    assert_eq!(p.children.len(), 1);
+    let policy_c = p.children.first().unwrap();
+    if let XPolicyEntry::PolicySetIdRef(c) = policy_c {
+	assert_eq!(c, "will-become-a-policyset");
+    } else {
+	panic!("Expected a policySetId, not a PolicyId");
+    }
+}
