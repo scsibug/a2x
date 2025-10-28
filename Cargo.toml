@@ -9,6 +9,7 @@ readme = "README.md"
 description = "A converter from ALFA to XACML policy language."
 keywords = ["XACML", "ALFA"]
 categories = ["command-line-utilities", "compilers"]
+exclude = [".build.yml", ".config"]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
