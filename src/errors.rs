@@ -15,8 +15,8 @@ pub enum ParseError {
     UnexpectedRuleError(String),
     #[error("Duplicate symbol: {}", _0)]
     DuplicateSymbol(String),
-    #[error("Symbol not found during resolution")]
-    SymbolNotFound(String),
+    #[error("Could not resolve symbol: {}, from namespace: {}", _0, _1)]
+    SymbolNotFound(String, String),
     #[error("Ambiguous Import")]
     AmbiguousImport(String),
     #[error("Duplicate definition of infix function modifier")]
