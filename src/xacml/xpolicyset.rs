@@ -161,14 +161,14 @@ impl TryFrom<&PolicySet> for XPolicySet {
                         children.push(XPolicyEntry::PolicySetIdRef(ps.get_id()));
                     } else if let Ok(ps) = p.ctx.lookup_policy(&pr.id, &p.ns) {
                         info!("we found a policy");
-			// if the policy has a condition, it will be
-			// transformed into a policyset, and we need
-			// to reference it appropriately.
-			if ps.condition.is_none() {
+                        // if the policy has a condition, it will be
+                        // transformed into a policyset, and we need
+                        // to reference it appropriately.
+                        if ps.condition.is_none() {
                             children.push(XPolicyEntry::PolicyIdRef(ps.get_id()));
-			} else {
-			    children.push(XPolicyEntry::PolicySetIdRef(ps.get_id()));
-			}
+                        } else {
+                            children.push(XPolicyEntry::PolicySetIdRef(ps.get_id()));
+                        }
                     } else {
                         warn!("failed to resolve policy reference in a policyset");
                         return Err(ParseError::UnexpectedRuleError(

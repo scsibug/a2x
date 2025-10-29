@@ -1,11 +1,16 @@
 //  SPDX-FileCopyrightText: 2025 Greg Heartsfield <scsibug@imap.cc>
 //  SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::Rule;
+use crate::{ast::SrcLoc, Rule};
+use miette::{Diagnostic, LabeledSpan, NamedSource};
+use std::{
+    fmt::{self},
+    sync::Arc,
+};
 use thiserror::Error;
 
 /// Error thrown when parsing fails.
-#[derive(Debug, Clone, Eq, PartialEq, Error)]
+#[derive(Debug, Clone, Eq, PartialEq, Error, Diagnostic)]
 pub enum ParseError {
     #[error("Pest parsing error: {}", _0)]
     PestParseError(Box<pest::error::Error<Rule>>),
@@ -37,14 +42,10 @@ pub enum ParseError {
     InfixBagsDisallowed,
     #[error("Infix operators on bags must return booleans")]
     InfixBagsBooleanRequired,
-    #[error("Conditions must return booleans")]
-    ConditionBooleanRequired,
     #[error("Infix operators had no matching signature for argument types")]
     InfixNoMatchingSignature,
     #[error("Context no longer available")]
     ContextMissing,
-    #[error("Missing apply statement")]
-    MissingApplyStatement,
     #[error("Could not write to XACML file")]
     XacmlWriteIoError,
     #[error("Could not determine policy filename")]
@@ -59,6 +60,50 @@ pub enum ParseError {
     PolicyHasCondition,
     #[error("A PolicySet and Policy have the same name in the same policy: {}", _0)]
     DuplicatePolicyEntity(String),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    SrcError(#[from] SrcError),
+}
+
+#[derive(Error, Debug, Eq, PartialEq, Clone)]
+#[allow(unused_assignments)]
+pub struct SrcError {
+    //#[label("error here")]
+    //at: SourceSpan,
+    //    #[label]
+    labels: Vec<LabeledSpan>,
+    msg: String,
+    //    #[source_code]
+    src: Arc<NamedSource<String>>,
+}
+
+impl Diagnostic for SrcError {
+    fn labels(&self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + '_>> {
+        Some(Box::new(self.labels.iter().cloned()))
+    }
+
+    fn source_code(&self) -> Option<&dyn miette::SourceCode> {
+        Some(&*self.src)
+    }
+}
+
+impl fmt::Display for SrcError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
+impl SrcError {
+    pub fn new(msg: &str, label: &str, src_loc: SrcLoc) -> ParseError {
+        ParseError::SrcError(SrcError {
+            src: src_loc.get_src(),
+            labels: vec![LabeledSpan::new_with_span(
+                Some(label.to_owned()),
+                src_loc.get_span(),
+            )],
+            msg: msg.to_owned(),
+        })
+    }
 }
 
 impl From<pest::error::Error<Rule>> for ParseError {

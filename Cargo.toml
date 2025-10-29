@@ -16,6 +16,7 @@ clap = { version = "4.5", features = ["derive"] }
 env_logger = "0.11"
 log = "0.4"
 pest = { version = "2.7", features = ["miette-error", "pretty-print"] }
+miette = { version = "7.6", features = ["fancy"] }
 pest_derive = "2.7"
 thiserror = "2.0"
 unescaper = "0.1"

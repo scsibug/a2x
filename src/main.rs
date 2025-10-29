@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::rc::Rc;
 use walkdir::WalkDir;
+use miette::Report;
 
 fn main() -> ExitCode {
     let args = CLIArgs::parse();
@@ -46,7 +47,7 @@ fn main() -> ExitCode {
             Err(pe) => {
                 warn!("compilation failed");
                 eprintln!("Conversion to XACML Failed:");
-                eprintln!("{pe}");
+                eprintln!("{:?}", Report::new(pe));
                 return ExitCode::FAILURE;
             }
             Ok(xfiles) => {
@@ -81,7 +82,7 @@ fn get_alfa_sources(input: Vec<PathBuf>) -> Vec<AlfaFile> {
         let mut buffer = String::new();
         f.read_to_string(&mut buffer).expect("could not read file");
         alfa_sources.push(AlfaFile {
-            filename: i.clone(),
+            filename: i.to_str().unwrap_or("<unknown path>").to_owned(),
             contents: buffer,
         });
     }

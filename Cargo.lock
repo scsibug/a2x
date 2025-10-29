@@ -9,6 +9,7 @@ dependencies = [
  "clap",
  "env_logger",
  "log",
+ "miette",
  "pest",
  "pest_derive",
  "pretty_assertions",

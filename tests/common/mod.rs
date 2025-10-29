@@ -4,7 +4,6 @@ use a2x::xacml::xpolicy::XPolicy;
 use a2x::xacml::xpolicyset::XPolicySet;
 use a2x::xacml::{XTopPolicy, XacmlWriter};
 use a2x::AlfaFile;
-use std::path::PathBuf;
 use std::rc::Rc;
 use unwrap::unwrap;
 use xml::EmitterConfig;
@@ -16,7 +15,7 @@ pub fn compile_alfa_src(src: &str) -> Vec<XTopPolicy> {
     let ctx = Rc::new(Context::default());
     // a single file.
     let sources = vec![AlfaFile {
-        filename: PathBuf::default(),
+        filename: "".to_owned(),
         contents: src.to_owned(),
     }];
     unwrap!(alfa_compile(&ctx, sources), "compile failed")
@@ -33,7 +32,7 @@ pub fn compile_alfa_srcs(src: Vec<String>) -> Vec<XTopPolicy> {
         .into_iter()
         .enumerate()
         .map(|(index, s)| AlfaFile {
-            filename: PathBuf::from(format!("{base_name}{index}")),
+            filename: format!("{base_name}{index}"),
             contents: s,
         })
         .collect();

@@ -450,7 +450,10 @@ where
         } else {
             debug!("There were no import statements, so this symbol could not be resolved");
         }
-        Err(ParseError::SymbolNotFound(symbol.to_owned(), source_ns.join(".")))
+        Err(ParseError::SymbolNotFound(
+            symbol.to_owned(),
+            source_ns.join("."),
+        ))
     }
 }
 

@@ -50,7 +50,7 @@ use crate::ast::target::{
     ConjunctiveSeq, DisjunctiveSeq, Match, MatchFunction, MatchOperation, Target,
 };
 use crate::ast::typedef::TypeDef;
-use crate::errors::ParseError;
+use crate::errors::{ParseError, SrcError};
 use crate::AlfaParseTree;
 use crate::Context;
 use crate::Rule;
@@ -62,6 +62,7 @@ use condition::{
 };
 use designator::AttributeDesignator;
 use log::{debug, error, info, warn};
+use miette::{NamedSource, SourceCode, SourceSpan};
 use naming::GenName;
 use pest::iterators::Pair;
 use pest::iterators::Pairs;
@@ -70,8 +71,8 @@ use prescription::{
 };
 use rule::{Effect, RuleDef};
 use std::cell::RefCell;
-use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Arc;
 use unescaper::unescape;
 
 #[cfg(test)]
@@ -107,6 +108,57 @@ impl AlfaSyntaxTree {
     }
 }
 
+/// Identify a specific location in a source tree.
+#[derive(Debug, Clone)]
+pub struct SrcLoc {
+    src: Arc<NamedSource<String>>,
+    span: SourceSpan,
+}
+
+impl Default for SrcLoc {
+    fn default() -> Self {
+        SrcLoc {
+            src: Arc::new(NamedSource::new("<default>", "".to_string())),
+            span: (0, 0).into(),
+        }
+    }
+}
+
+impl SrcLoc {
+    /// Create a new SrcLoc
+    pub fn new(src: NamedSource<String>, span: SourceSpan) -> SrcLoc {
+        let mut s = SrcLoc {
+            src: std::sync::Arc::new(src),
+            span,
+        };
+        s.trim_trailing_whitespace();
+        s
+    }
+    pub fn get_src(&self) -> Arc<NamedSource<String>> {
+        self.src.clone()
+    }
+    pub fn get_span(&self) -> SourceSpan {
+        self.span.clone()
+    }
+
+    /// Replace the span with a new value
+    pub fn with_new_span(&self, span: SourceSpan) -> SrcLoc {
+        let mut s = SrcLoc {
+            src: self.src.clone(),
+            span: span,
+        };
+        s.trim_trailing_whitespace();
+        s
+    }
+    /// Update the span to remove trailing whitespace
+    fn trim_trailing_whitespace(&mut self) {
+        if let Ok(s) = self.src.read_span(&self.span, 0, 0) {
+            let new_len = s.data().trim_ascii_end().len();
+            self.span = (self.span.offset(), new_len).into();
+        }
+    }
+}
+
 // AlfaSyntaxTree implement TryFrom<AlfaParseTree> to create itself.
 impl TryFrom<AlfaParseTree<'_>> for AlfaSyntaxTree {
     type Error = ParseError;
@@ -117,15 +169,18 @@ impl TryFrom<AlfaParseTree<'_>> for AlfaSyntaxTree {
         let mut pairs = pt.pairs;
         // the first item must be an alfa_doc as the top-level.
         let doc = pairs.next().ok_or(ParseError::AstConvertError)?;
-        if doc.as_rule() == Rule::alfa_doc {
-            debug!("Found Alfa Document: <<<{}>>>", doc.as_str());
-        }
+        assert!(doc.as_rule() == Rule::alfa_doc);
         let ns_toplevel = doc.into_inner();
         let mut namespaces = vec![];
         for ns in ns_toplevel {
             if ns.as_rule() == Rule::namespace {
-                debug!("processing a namespace...({ns})");
-                let n = process_namespace(ns.into_inner(), vec![], ctx.clone())?;
+                debug!("processing a namespace...");
+                let n = process_namespace(
+                    ns.into_inner(),
+                    SrcLoc::new(pt.src.clone(), (0, 0).into()),
+                    vec![],
+                    ctx.clone(),
+                )?;
                 namespaces.push(n);
             } else {
                 debug!("skipping comment...");
@@ -159,6 +214,7 @@ fn comment_cleanup(raw: &str) -> &str {
 #[allow(clippy::needless_pass_by_value)]
 fn process_namespace(
     mut ns_pairs: Pairs<Rule>,
+    src_loc: SrcLoc,
     ns_path: Vec<String>,
     ctx: Rc<Context>,
 ) -> Result<Namespace, ParseError> {
@@ -194,12 +250,17 @@ fn process_namespace(
             if let Some(first_stmt) = inner_stmt.next() {
                 let r = first_stmt.as_rule();
                 if r == Rule::namespace {
-                    let child_ns =
-                        process_namespace(first_stmt.into_inner(), ns.path.clone(), ctx.clone())?;
+                    let child_ns = process_namespace(
+                        first_stmt.into_inner(),
+                        src_loc.clone(),
+                        ns.path.clone(),
+                        ctx.clone(),
+                    )?;
                     ns.add_namespace(child_ns);
                 } else if r == Rule::policyset_decl {
                     ns.add_policyset(process_policyset(
                         first_stmt,
+                        src_loc.clone(),
                         ns.path.clone(),
                         GenName::default(),
                         last_comment.clone(),
@@ -210,6 +271,7 @@ fn process_namespace(
                     // provide namespace to policy
                     ns.add_policy(process_policy(
                         first_stmt.into_inner(),
+                        &src_loc,
                         ns.path.clone(),
                         GenName::default(),
                         last_comment.clone(),
@@ -254,6 +316,7 @@ fn process_namespace(
                 } else if r == Rule::rule_decl {
                     let rule_item = process_rule(
                         first_stmt.into_inner(),
+                        src_loc.clone(),
                         ns.path.clone(),
                         GenName::default(),
                         last_comment.clone(),
@@ -400,6 +463,7 @@ fn process_function_output(mut arg_pairs: Pairs<Rule>) -> Result<FunctionOutputA
 // parse a rule declaration, either in policy or namespace.
 fn process_rule(
     mut rule_pairs: Pairs<Rule>,
+    src_loc: SrcLoc,
     ns: Vec<String>,
     policy_ns: GenName,
     description: Option<String>,
@@ -460,7 +524,12 @@ fn process_rule(
             }
         } else if tok.as_rule() == Rule::condition_stmt {
             if condition.is_none() {
-                condition = Some(process_condition(tok.into_inner(), ns.clone(), ctx)?);
+                condition = Some(process_condition(
+                    tok.into_inner(),
+                    src_loc.clone(),
+                    ns.clone(),
+                    ctx,
+                )?);
             } else {
                 return Err(ParseError::DuplicateCondition);
             }
@@ -619,15 +688,20 @@ fn process_target_match(match_pair: Pair<Rule>) -> Result<Match, ParseError> {
 
 fn process_condition(
     cond_pairs: Pairs<Rule>,
+    src_loc: SrcLoc,
     ns: Vec<String>,
     ctx: &Rc<Context>,
 ) -> Result<Condition, ParseError> {
     info!("Parsing a condition");
     // first and only non-comment item in a cond_stmt is a cond_expression.
-    let cond_expr = process_condition_expr(cond_pairs, &ns)?;
+    let cond_expr = process_condition_expr(cond_pairs, &src_loc, &ns)?;
+    //let src_loc_new = src_loc.with_new_span(cond_expr.src_loc.span
+    info!("cond-expr src_loc:  {:?}", cond_expr.src_loc);
+    let new_src_loc = src_loc.with_new_span(cond_expr.src_loc.span.clone());
     let c = ConditionUnparsed {
         cond_expr,
         ns,
+        src_loc: new_src_loc,
         ctx: Rc::<Context>::downgrade(ctx),
     };
     // Pratt-Parsed condition
@@ -637,24 +711,42 @@ fn process_condition(
 /// Process a condition expression from Pairs, skipping comments
 fn process_condition_expr(
     mut cond_pairs: Pairs<Rule>,
+    src_loc: &SrcLoc,
     ns: &[String],
 ) -> Result<CondExpressionUnparsed, ParseError> {
     let cond_expr = skip_comments(&mut cond_pairs).ok_or(ParseError::AstConvertError)?;
     assert_eq!(cond_expr.as_rule(), Rule::cond_expr);
-    process_condition_expr_pair(cond_expr, ns)
+    process_condition_expr_pair(cond_expr, src_loc, ns)
 }
 
 /// Process a condition expression Rule.
 fn process_condition_expr_pair(
     cond_pair: Pair<Rule>,
+    src_loc: &SrcLoc,
     ns: &[String],
 ) -> Result<CondExpressionUnparsed, ParseError> {
     assert_eq!(cond_pair.as_rule(), Rule::cond_expr);
+    // since this is a Pair, we can determine the start and end point.
+    let sp = cond_pair.as_span();
+    let start_pos = sp.start();
+    // default ending position
+    let mut end_pos = sp.end();
     let mut items: Vec<CondItemUnparsed> = vec![];
     let mut cond_expr = cond_pair.into_inner();
+    info!("span1: starting loop with end_pos: {end_pos}");
     while let Some(tok) = skip_comments(&mut cond_expr) {
+        end_pos = tok.as_span().end();
+        info!(
+            "span1: updated end_pos to {end_pos} with rule {:?}",
+            tok.as_rule()
+        );
+        info!(
+            "span1: full string is <<{}>> (len: {}",
+            tok.as_str(),
+            tok.as_str().len()
+        );
         if tok.as_rule() == Rule::cond_atom {
-            let c = process_condition_atom(tok.into_inner(), ns)?;
+            let c = process_condition_atom(tok.into_inner(), src_loc, ns)?;
             items.push(CondItemUnparsed::Atom(c));
         } else if tok.as_rule() == Rule::operator_identifier {
             items.push(CondItemUnparsed::Op(process_operator(&tok)?));
@@ -665,11 +757,15 @@ fn process_condition_expr_pair(
             )));
         }
     }
-    Ok(CondExpressionUnparsed { items })
+    Ok(CondExpressionUnparsed {
+        src_loc: src_loc.with_new_span((start_pos, end_pos - start_pos).into()),
+        items,
+    })
 }
 
 fn process_condition_atom(
     mut cond_atom: Pairs<Rule>,
+    src_loc: &SrcLoc,
     ns: &[String],
 ) -> Result<CondAtomUnparsed, ParseError> {
     info!("parsing condition atom: {cond_atom:?}");
@@ -678,7 +774,7 @@ fn process_condition_atom(
         let r = tok.as_rule();
         if r == Rule::cond_function_call {
             info!("atom > function call");
-            let f = process_condition_function(tok.into_inner(), ns)?;
+            let f = process_condition_function(tok.into_inner(), src_loc, ns)?;
             return Ok(CondAtomUnparsed::Fn(f));
         } else if r == Rule::cond_function_ref {
             info!("function reference");
@@ -693,7 +789,7 @@ fn process_condition_atom(
             info!("the tok is: {tok:?}");
             //info!("atom > expression: {:?}", cond_atom.as_str());
             // we need to call it with the cond_atom
-            let e = process_condition_expr_pair(tok, ns)?;
+            let e = process_condition_expr_pair(tok, src_loc, ns)?;
             return Ok(CondAtomUnparsed::Expr(e));
         } else if r == Rule::attribute_designator {
             info!("got an attribute designator in condition");
@@ -751,6 +847,7 @@ fn process_attribute_designator(attr_pair: Pair<Rule>) -> Result<AttributeDesign
 
 fn process_condition_function(
     mut cond_fn: Pairs<Rule>,
+    src_loc: &SrcLoc,
     ns: &[String],
 ) -> Result<CondFunctionCallUnparsed, ParseError> {
     info!("parsing cond fn: {:?}", cond_fn.as_str());
@@ -764,7 +861,7 @@ fn process_condition_function(
     info!("elem_identifier:  {elem_ident:?}");
     if let Some(arglist) = skip_comments(&mut cond_fn) {
         assert_eq!(arglist.as_rule(), Rule::cond_argument_list);
-        arguments = process_cond_argument_list(arglist.into_inner(), ns)?;
+        arguments = process_cond_argument_list(arglist.into_inner(), src_loc, ns)?;
     }
 
     Ok(CondFunctionCallUnparsed {
@@ -775,12 +872,13 @@ fn process_condition_function(
 
 fn process_cond_argument_list(
     mut arg_pairs: Pairs<Rule>,
+    src_loc: &SrcLoc,
     ns: &[String],
 ) -> Result<Vec<CondExpressionUnparsed>, ParseError> {
     let mut arguments = vec![];
     while let Some(tok) = skip_comments(&mut arg_pairs) {
         if tok.as_rule() == Rule::cond_expr {
-            let x = process_condition_expr_pair(tok, ns)?;
+            let x = process_condition_expr_pair(tok, src_loc, ns)?;
             arguments.push(x);
         } else {
             return Err(ParseError::UnexpectedRuleError("expected expr".to_string()));
@@ -1219,6 +1317,7 @@ fn process_policycombinator(
 
 fn process_policyset(
     policyset_pair: Pair<Rule>,
+    src_loc: SrcLoc,
     ns_path: Vec<String>,
     mut parent_policy_path: GenName,
     description: Option<String>,
@@ -1227,6 +1326,9 @@ fn process_policyset(
 ) -> Result<PolicySet, ParseError> {
     info!("found a policyset");
     assert_eq!(policyset_pair.as_rule(), Rule::policyset_decl);
+    let sp = policyset_pair.as_span();
+    let start_pos = sp.start();
+    let end_pos = sp.end();
     let mut policyset_pairs = policyset_pair.into_inner();
     let policy_id_rule = skip_comments(&mut policyset_pairs).ok_or(ParseError::AstConvertError)?;
     let policy_id = policy_naming(policy_id_rule, ctx.clone())?;
@@ -1242,6 +1344,7 @@ fn process_policyset(
     let mut prescriptions = vec![];
     // only register this policyset if it has a name, and the parent has a name.
     let do_register = (policy_id != PolicyId::PolicyNoName) && register;
+
     // compute what child elements should receive for their policy_path:
     match &policy_id {
         PolicyId::PolicyNoName => parent_policy_path.push_name(Rc::new(RefCell::new(None))),
@@ -1284,7 +1387,12 @@ fn process_policyset(
                 info!("target: {target:?}");
             } else if stmt.as_rule() == Rule::condition_stmt {
                 if condition.is_none() {
-                    condition = Some(process_condition(stmt.into_inner(), ns_path.clone(), &ctx)?);
+                    condition = Some(process_condition(
+                        stmt.into_inner(),
+                        src_loc.clone(),
+                        ns_path.clone(),
+                        &ctx,
+                    )?);
                 } else {
                     return Err(ParseError::DuplicateCondition);
                 }
@@ -1301,6 +1409,7 @@ fn process_policyset(
                 //}
                 let p = process_policy(
                     stmt.into_inner(),
+                    &src_loc,
                     ns_path.clone(),
                     parent_policy_path.clone(),
                     last_comment.clone(),
@@ -1312,6 +1421,7 @@ fn process_policyset(
                 info!("PS creation");
                 let p = process_policyset(
                     stmt,
+                    src_loc.clone(),
                     ns_path.clone(),
                     parent_policy_path.clone(),
                     last_comment.clone(),
@@ -1341,7 +1451,11 @@ fn process_policyset(
         ns: ns_path,
         policy_ns: parent_policy_path,
         description,
-        apply: apply.ok_or(ParseError::MissingApplyStatement)?,
+        apply: apply.ok_or(SrcError::new(
+            "PolicySets must have an apply statement",
+            "missing an apply statement",
+            src_loc.with_new_span((start_pos, end_pos - start_pos).into()),
+        ))?,
         target,
         condition,
         policies,
@@ -1352,6 +1466,7 @@ fn process_policyset(
 
 fn process_policy(
     mut policy_pairs: Pairs<Rule>,
+    src_loc: &SrcLoc,
     ns_path: Vec<String>,
     mut parent_policy_path: GenName,
     description: Option<String>,
@@ -1371,6 +1486,10 @@ fn process_policy(
     let mut prescriptions: Vec<Prescription> = vec![];
     // keep track of last comment for rule definitions
     let mut last_comment = None;
+    // get span info for this policy
+    let sp = policy_id_rule.as_span();
+    let start_pos = sp.start();
+    let mut _end_pos = sp.end();
     // turn the policy_naming_rule into a PolicyId
     let policy_id = policy_naming(policy_id_rule, ctx.clone())?;
     // only register this policyset if it has a name, and the parent has a name.
@@ -1439,6 +1558,9 @@ fn process_policy(
         //let mut inner_stmt = stmt.into_inner();
         //debug!("inner_stmt: {inner_stmt:?}");
         if policy_stmt.as_rule() == Rule::policy_stmt {
+            // update end position of span based on additional policy statements
+            let sp = policy_stmt.as_span();
+            _end_pos = sp.end();
             let mut t = policy_stmt.into_inner();
             let stmt = skip_comments(&mut t).ok_or(ParseError::AstConvertError)?;
             // Apply statement
@@ -1457,7 +1579,12 @@ fn process_policy(
                 }
             } else if stmt.as_rule() == Rule::condition_stmt {
                 if condition.is_none() {
-                    condition = Some(process_condition(stmt.into_inner(), ns_path.clone(), &ctx)?);
+                    condition = Some(process_condition(
+                        stmt.into_inner(),
+                        src_loc.clone(),
+                        ns_path.clone(),
+                        &ctx,
+                    )?);
                 } else {
                     return Err(ParseError::DuplicateCondition);
                 }
@@ -1488,6 +1615,7 @@ fn process_policy(
                 // this used to be the ns_rule_path, but now it is just the ns_path
                 let rule_decl = process_rule(
                     stmt.into_inner(),
+                    src_loc.clone(),
                     ns_path.clone(),
                     parent_policy_path.clone(),
                     last_comment.clone(),
@@ -1530,7 +1658,11 @@ fn process_policy(
         ns: ns_path,
         policy_ns: parent_policy_path,
         description,
-        apply: apply.ok_or(ParseError::MissingApplyStatement)?,
+        apply: apply.ok_or(SrcError::new(
+            "PolicySets must have an apply statement",
+            "this policy needs an apply statement",
+            src_loc.with_new_span(start_pos.into()),
+        ))?,
         target,
         condition,
         rules,
@@ -1680,8 +1812,8 @@ pub trait AsAlfa {
 /// An `AlfaSyntaxTree` and the source path information.
 #[derive(Debug)]
 pub struct AstSource {
-    /// Filename that contained the source Alfa.
-    pub filename: PathBuf,
+    /// NamedSource with original contents, for error reporting
+    pub src: NamedSource<String>,
     /// The parsed syntax tree.
     pub ast: AlfaSyntaxTree,
 }

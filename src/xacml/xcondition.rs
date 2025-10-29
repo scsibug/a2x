@@ -16,7 +16,7 @@ use crate::ast::infix::Infix;
 use crate::ast::infix::InfixSignature;
 use crate::ast::operator::Operator;
 use crate::context::Context;
-use crate::errors::ParseError;
+use crate::errors::{ParseError, SrcError};
 use log::debug;
 use log::error;
 use log::info;
@@ -36,17 +36,27 @@ impl TryFrom<&Condition> for XCondition {
     fn try_from(c: &Condition) -> Result<Self, Self::Error> {
         let ctx = c.ctx.upgrade().ok_or(ParseError::ContextMissing)?;
         // Ensure the top-level type is an atomic boolean.
-        let t = type_for_expr(&c.cond_expr, &c.ns, &ctx);
+        // if the expression has a symbol error (say, function not found), we just get None instead of the error.
+        let t = type_for_expr(&c.cond_expr, &c.ns, &ctx).ok();
         if let Some(FunctionTypeResolved::Atomic(n)) = t {
             // ensure boolean
             if n.uri != crate::ast::typedef::BOOLEAN_URI {
                 info!("The condition expression does not resolve to a boolean type");
-                return Err(ParseError::ConditionBooleanRequired);
+                info!("Observed type, atomic: {:?}", &n);
+                return Err(SrcError::new(
+                    "Conditions must evaluate to booleans",
+                    &format!("type is {:?}", n.uri),
+                    c.src_loc.clone(),
+                ));
             }
         } else {
             // If the type is not atomic, this is an error.
-            info!("The condition expression does not resolve to a boolean type (or atomic)");
-            return Err(ParseError::ConditionBooleanRequired);
+            info!("The condition expression does not resolve to an atomic type");
+            return Err(SrcError::new(
+                "Conditions must evaluate to atomic booleans",
+                "non-atomic type",
+                c.src_loc.clone(),
+            ));
         }
         // The ALFA spec seems to imply literals are not allowed, but
         // the resulting XACML would still be valid, so we don't care.
@@ -56,29 +66,27 @@ impl TryFrom<&Condition> for XCondition {
     }
 }
 
-/// Determine the fully-resolved type name for an expression, if one exists.
+/// Determine the fully-resolved type name for an expression.
 fn type_for_expr(
     e: &CondExpression,
     source_ns: &[String],
     ctx: &Context,
-) -> Option<FunctionTypeResolved> {
+) -> Result<FunctionTypeResolved, ParseError> {
     match e {
         CondExpression::Infix(e1, o, e2) => {
             sig_and_type_for_infix(e1, o, e2, source_ns, ctx).map(|(_sig, typeres)| typeres)
         }
-        CondExpression::Lit(c) => Some(FunctionTypeResolved::Atomic(resolve_literal_types(
-            c, source_ns, ctx,
-        )?)),
+        CondExpression::Lit(c) => Ok(FunctionTypeResolved::Atomic(
+            resolve_literal_types(c, source_ns, ctx).ok_or(ParseError::AstConvertError)?,
+        )),
         CondExpression::Attr(ad) => {
             // lookup the attribute
-            let attr = ctx
-                .lookup_attribute(&ad.fully_qualified_name(), source_ns)
-                .ok()?;
+            let attr = ctx.lookup_attribute(&ad.fully_qualified_name(), source_ns)?;
             info!("found attribute: {attr:?}");
             // lookup the type definition
-            let typedef = ctx.lookup_type(&attr.typedef, &[attr.ns.join(".")]).ok()?;
+            let typedef = ctx.lookup_type(&attr.typedef, &[attr.ns.join(".")])?;
             // Attributes are always bags of atomics
-            Some(FunctionTypeResolved::AtomicBag(ResolvedAtomicName {
+            Ok(FunctionTypeResolved::AtomicBag(ResolvedAtomicName {
                 uri: typedef.uri.clone(),
             }))
         }
@@ -86,21 +94,25 @@ fn type_for_expr(
             info!("request was for {fn_call:?}");
             // simply check the return type of the function.
             // TODO: check (somewhere) that the arguments are compatible.
-            let func = ctx
-                .lookup_function(&fn_call.fully_qualified_name(), source_ns)
-                .ok()?;
+            let func = ctx.lookup_function(&fn_call.fully_qualified_name(), source_ns)?;
+            info!("finished lookup");
             match &func.output_arg {
                 FunctionOutputArg::Atomic(a) => {
                     // a is the alfa name of  the output type, which we need to convert to a URI
                     // the symbol is whatever came from the function definition.
                     // the source namespace is the function's namespace.
-                    let typedef = ctx.lookup_type(a, &func.ns).ok()?;
-                    Some(FunctionTypeResolved::Atomic(ResolvedAtomicName {
+                    let typedef = ctx.lookup_type(a, &func.ns)?;
+                    Ok(FunctionTypeResolved::Atomic(ResolvedAtomicName {
                         uri: typedef.uri.clone(),
                     }))
                 }
                 // TODO: remaining types
-                _ => None,
+                // This would be helpful for troubleshooting.
+                x => {
+                    info!("type was {:?}", x);
+                    // TODO: produce a type name here, this isn't an error.
+                    Err(ParseError::AstConvertError)
+                }
             }
         }
         CondExpression::FnRef(fn_ref) => {
@@ -108,11 +120,11 @@ fn type_for_expr(
             // allowed as the output type of an expression, so we will
             // always return None.
             info!("type resolution requested for {fn_ref:?}");
-            None
+            Err(ParseError::AstConvertError)
         }
         CondExpression::Empty => {
             info!("Expression was empty, has no type");
-            None
+            Err(ParseError::AstConvertError)
         }
     }
 }
@@ -124,12 +136,12 @@ fn sig_and_type_for_infix(
     arg2: &CondExpression,
     source_ns: &[String],
     ctx: &Context,
-) -> Option<(InfixSignature, FunctionTypeResolved)> {
+) -> Result<(InfixSignature, FunctionTypeResolved), ParseError> {
     // an operation needs to be converted into a function ID.
     info!("operation is: {op}");
     // lookup operation, using inverse as a fallback.
     // there is no point in looking up the inverse, because the user should be using the correct function.
-    let infix = ctx.lookup_infix(&op.qualified_name(), source_ns).ok()?;
+    let infix = ctx.lookup_infix(&op.qualified_name(), source_ns)?;
     info!("found operation:  {infix:?}");
     // lookup types of the arguments.  This currently only works for constants, but we will expand this.
     // get an expression for the first arg.
@@ -141,9 +153,9 @@ fn sig_and_type_for_infix(
     for s in &infix.signatures {
         // lookup the fully resolved type for each argument.
         info!("checking signature: {s:?}");
-        let first_type_uri = &ctx.lookup_type(&s.first_arg, &infix.ns).ok()?.uri;
-        let second_type_uri = &ctx.lookup_type(&s.second_arg, &infix.ns).ok()?.uri;
-        let output_type_uri = &ctx.lookup_type(&s.output, &infix.ns).ok()?.uri;
+        let first_type_uri = &ctx.lookup_type(&s.first_arg, &infix.ns)?.uri;
+        let second_type_uri = &ctx.lookup_type(&s.second_arg, &infix.ns)?.uri;
+        let output_type_uri = &ctx.lookup_type(&s.output, &infix.ns)?.uri;
         info!("1st:  {first_type_uri:?}");
         info!("2nd:  {second_type_uri:?}");
         info!("output:  {output_type_uri:?}");
@@ -168,7 +180,7 @@ fn sig_and_type_for_infix(
         let is_arg_2_bag = second_arg_type.is_bag();
         info!("left arg bag? {is_arg_1_bag:?}; right arg bag? {is_arg_2_bag:?}");
         // determine output type
-        let output_type = &ctx.lookup_type(&sig.output, &infix.ns).ok()?;
+        let output_type = &ctx.lookup_type(&sig.output, &infix.ns)?;
         info!(
             "setting output type: {:?}, but should be using {:?}",
             sig.output, output_type
@@ -177,9 +189,10 @@ fn sig_and_type_for_infix(
             uri: output_type.uri.clone(),
         });
         // we now know the output type, and the infix signature.
-        return Some((sig.clone(), output_type));
+        return Ok((sig.clone(), output_type));
     }
-    None
+    // TODO: custom error
+    Err(ParseError::AstConvertError)
 }
 
 /// Convert literal constants into a XACML expression.
@@ -258,8 +271,8 @@ fn handle_infix_expression(
 ) -> Result<XExpression, ParseError> {
     let infix = ctx.lookup_infix(&o.qualified_name(), source_ns)?;
     // Determine type of first and second arguments
-    let first_arg_type = type_for_expr(ce1, source_ns, ctx).ok_or(ParseError::AstConvertError)?;
-    let second_arg_type = type_for_expr(ce2, source_ns, ctx).ok_or(ParseError::AstConvertError)?;
+    let first_arg_type = type_for_expr(ce1, source_ns, ctx)?;
+    let second_arg_type = type_for_expr(ce2, source_ns, ctx)?;
     // Find compatible signature
     let sig = resolve_infix_signature(&infix, &first_arg_type, &second_arg_type, ctx)?;
     // Convert arguments

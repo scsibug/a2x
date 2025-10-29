@@ -1,7 +1,7 @@
 use super::constant::Constant;
 use super::designator::AttributeDesignator;
 use super::operator::Operator;
-use super::PrettyPrint;
+use super::{PrettyPrint, SrcLoc};
 use crate::errors::ParseError;
 use crate::Context;
 use std::fmt;
@@ -13,6 +13,8 @@ use std::rc::Weak;
 // CondAtomUnparsed -> CondAtom
 // CondFunctionCallUnparsed -> CondFunctionCall
 
+// we should include a SourceSpan for error reporting
+
 /// A condition, with unparsed expressions
 #[derive(Debug, Default, Clone)]
 pub struct Condition {
@@ -21,6 +23,8 @@ pub struct Condition {
     pub cond_expr: CondExpression,
     /// The namespace this target is located in
     pub ns: Vec<String>,
+    /// The location of this condition
+    pub src_loc: SrcLoc,
     /// Context for conversion
     pub ctx: Weak<Context>,
 }
@@ -119,6 +123,7 @@ impl TryFrom<&ConditionUnparsed> for Condition {
         Ok(Condition {
             cond_expr: CondExpression::try_from(&c.cond_expr)?,
             ns: c.ns.clone(),
+            src_loc: c.src_loc.clone(),
             ctx: c.ctx.clone(),
         })
     }
@@ -208,13 +213,18 @@ pub struct ConditionUnparsed {
     pub cond_expr: CondExpressionUnparsed,
     /// The namespace this target is located in
     pub ns: Vec<String>,
+    /// The source location
+    pub src_loc: SrcLoc,
     /// Context for conversion
     pub ctx: Weak<Context>,
 }
 
+//
+
 /// Unparsed expression
 #[derive(Debug, Default, Clone)]
 pub struct CondExpressionUnparsed {
+    pub src_loc: SrcLoc,
     pub items: Vec<CondItemUnparsed>,
 }
 

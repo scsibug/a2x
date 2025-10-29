@@ -367,7 +367,12 @@ fn test_cond_display_literal_string() -> Result<(), Box<dyn std::error::Error>> 
     let input = r#"condition "foo""#;
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: \"foo\"");
     Ok(())
 }
@@ -377,7 +382,12 @@ fn test_cond_display_literal_int() -> Result<(), Box<dyn std::error::Error>> {
     let input = "condition 3";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: 3");
     Ok(())
 }
@@ -387,7 +397,12 @@ fn test_cond_display_literal_float() -> Result<(), Box<dyn std::error::Error>> {
     let input = "condition 3.99";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: 3.99");
     Ok(())
 }
@@ -397,7 +412,12 @@ fn test_cond_display_literal_bool() -> Result<(), Box<dyn std::error::Error>> {
     let input = "condition true";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: true");
     Ok(())
 }
@@ -407,7 +427,12 @@ fn test_cond_display_expr() -> Result<(), Box<dyn std::error::Error>> {
     let input = "condition 3 + 3";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: (3 + 3)");
     Ok(())
 }
@@ -417,7 +442,12 @@ fn test_cond_display_expr_paren() -> Result<(), Box<dyn std::error::Error>> {
     let input = "condition (3 + 3)";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: (3 + 3)");
     Ok(())
 }
@@ -428,7 +458,12 @@ fn test_cond_display_expr_mult_op_left_assoc() -> Result<(), Box<dyn std::error:
     let input = "condition 1 + 2 + 3";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: ((1 + 2) + 3)");
     Ok(())
 }
@@ -439,7 +474,12 @@ fn test_cond_display_expr_mult_op_right_assoc() -> Result<(), Box<dyn std::error
     let input = "condition 1 | 2 | 3";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: (1 | (2 | 3))");
     Ok(())
 }
@@ -450,7 +490,12 @@ fn test_cond_display_expr_fn() -> Result<(), Box<dyn std::error::Error>> {
     let input = r#"condition foo(1,2,"foo")"#;
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), r#"Condition: foo(1, 2, "foo")"#);
     Ok(())
 }
@@ -470,7 +515,12 @@ fn test_cond_display_expr_fn_nested() -> Result<(), Box<dyn std::error::Error>> 
     let input = "condition add(1,subtract(7,9))";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: add(1, subtract(7, 9))");
     Ok(())
 }
@@ -481,7 +531,12 @@ fn test_cond_display_ops_and_fns() -> Result<(), Box<dyn std::error::Error>> {
     let input = "condition foo(1) + bar(2)";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: (foo(1) + bar(2))");
     Ok(())
 }
@@ -492,7 +547,12 @@ fn test_cond_display_simple_attr() -> Result<(), Box<dyn std::error::Error>> {
     let input = "condition subjectName";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: subjectName");
     Ok(())
 }
@@ -503,7 +563,12 @@ fn test_cond_display_simple_ns_attr() -> Result<(), Box<dyn std::error::Error>> 
     let input = "condition main.subjectName";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(format!("{cond}"), "Condition: main.subjectName");
     Ok(())
 }
@@ -514,7 +579,12 @@ fn test_cond_display_ns_attr_issuer() -> Result<(), Box<dyn std::error::Error>> 
     let input = r#"condition main.subjectName[issuer="foo"]"#;
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(
         format!("{cond}"),
         "Condition: main.subjectName[issuer=\"foo\"]"
@@ -528,7 +598,12 @@ fn test_cond_display_ns_attr_mustbepresent() -> Result<(), Box<dyn std::error::E
     let input = "condition main.subjectName[mustbepresent]";
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(
         format!("{cond}"),
         "Condition: main.subjectName[mustbepresent]"
@@ -542,7 +617,12 @@ fn test_cond_display_ns_attr_allopts() -> Result<(), Box<dyn std::error::Error>>
     let input = r#"condition main.subjectName[mustbepresent issuer="foo"]"#;
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
-    let cond = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let cond = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     assert_eq!(
         format!("{cond}"),
         r#"Condition: main.subjectName[mustbepresent issuer="foo"]"#
@@ -558,7 +638,12 @@ fn test_cond_pratt_simple() -> Result<(), Box<dyn std::error::Error>> {
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
     // process the statement
-    let parsed = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let parsed = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     // build the expected parse tree
     let arg3 = CondExpression::Lit(Constant::Integer("3".to_string()));
     let plus = Operator {
@@ -571,6 +656,7 @@ fn test_cond_pratt_simple() -> Result<(), Box<dyn std::error::Error>> {
         parsed,
         Condition {
             cond_expr: exp,
+            src_loc: SrcLoc::default(),
             ns: vec![],
             ctx: Rc::<Context>::downgrade(&ctx)
         }
@@ -588,7 +674,12 @@ fn test_cond_pratt_single_right_assoc() -> Result<(), Box<dyn std::error::Error>
     let mut pairs = AlfaDocParser::parse(Rule::condition_stmt, input)?;
     let pair = pairs.next().expect("parsed condition has a first member");
     // process the statement
-    let parsed = process_condition(pair.into_inner(), vec![], &Rc::new(Context::default()))?;
+    let parsed = process_condition(
+        pair.into_inner(),
+        SrcLoc::default(),
+        vec![],
+        &Rc::new(Context::default()),
+    )?;
     // build the expected parse tree
     let arg1 = CondExpression::Lit(Constant::Integer("1".to_string()));
     let arg2 = CondExpression::Lit(Constant::Integer("2".to_string()));
@@ -616,6 +707,7 @@ fn test_cond_pratt_single_right_assoc() -> Result<(), Box<dyn std::error::Error>
         parsed,
         Condition {
             cond_expr: exp,
+            src_loc: SrcLoc::default(),
             ns: vec![],
             ctx: Rc::<Context>::downgrade(&ctx)
         }

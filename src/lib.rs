@@ -41,6 +41,7 @@ use crate::xacml::XacmlWriter;
 use log::{info, warn};
 use std::fs::File;
 //use std::io::{self};
+use miette::NamedSource;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -62,6 +63,7 @@ pub struct AlfaDocParser;
 ///
 /// # Arguments
 /// * `policystr` - A string slice containing the ALFA policy document to parse
+/// * `src` - The ALFA document source, for error reporting
 /// * `ctx` - A reference-counted object that provides additional parsing context
 ///
 /// # Returns
@@ -76,9 +78,13 @@ pub struct AlfaDocParser;
 /// * The policy structure doesn't conform to the ALFA grammar rules
 /// * Required policy elements are missing or malformed
 ///
-pub fn parse_alfadoc(policystr: &str, ctx: Rc<Context>) -> Result<AlfaParseTree<'_>, ParseError> {
+pub fn parse_alfadoc<'a>(
+    policystr: &'a str,
+    src: &'a NamedSource<String>,
+    ctx: Rc<Context>,
+) -> Result<AlfaParseTree<'a>, ParseError> {
     let pairs = AlfaDocParser::parse(Rule::alfa_doc, policystr)?;
-    Ok(AlfaParseTree { pairs, ctx })
+    Ok(AlfaParseTree { pairs, src, ctx })
 }
 
 /// Parses a single ALFA policy document into an abstract syntax tree.
@@ -90,6 +96,7 @@ pub fn parse_alfadoc(policystr: &str, ctx: Rc<Context>) -> Result<AlfaParseTree<
 ///
 /// # Arguments
 /// * `policystr` - A string slice containing the ALFA policy document to parse
+/// * `src` - The ALFA document source, for error reporting
 /// * `ctx` - A reference-counted object that provides additional parsing context
 ///
 /// # Returns
@@ -104,8 +111,12 @@ pub fn parse_alfadoc(policystr: &str, ctx: Rc<Context>) -> Result<AlfaParseTree<
 /// * The policy structure doesn't conform to the ALFA grammar rules
 /// * Required policy elements are missing or malformed
 ///
-pub fn make_alfa_ast(policystr: &str, ctx: Rc<Context>) -> Result<ast::AlfaSyntaxTree, ParseError> {
-    let parse_tree = parse_alfadoc(policystr, ctx)?;
+pub fn make_alfa_ast(
+    policystr: &str,
+    src: &NamedSource<String>,
+    ctx: Rc<Context>,
+) -> Result<ast::AlfaSyntaxTree, ParseError> {
+    let parse_tree = parse_alfadoc(policystr, src, ctx)?;
     // this would be a good place to weave in the context, but no...
     let alfa_ast = ast::AlfaSyntaxTree::try_from(parse_tree)?;
     Ok(alfa_ast)
@@ -115,7 +126,7 @@ pub fn make_alfa_ast(policystr: &str, ctx: Rc<Context>) -> Result<ast::AlfaSynta
 #[derive(Debug)]
 pub struct AlfaFile {
     /// Filename this alfa source file was read from.
-    pub filename: PathBuf,
+    pub filename: String,
     /// Original contents of the alfa source file.
     pub contents: String,
 }
@@ -205,7 +216,12 @@ pub fn alfa_compile(
     // alfa ast conversion
     for asource in alfa_sources {
         info!("== {:?} ==", asource.filename);
-        match make_alfa_ast(&asource.contents, ctx.clone()) {
+        let filename = asource.filename.to_string();
+        // store source code for error reporting later
+        let alfasrc =
+            NamedSource::new(filename.clone(), asource.contents.clone()).with_language("ALFA");
+        info!("alfasrc: {:?}", alfasrc);
+        match make_alfa_ast(&asource.contents, &alfasrc, ctx.clone()) {
             Ok(ast) => {
                 info!("Successfully parsed the document.");
                 info!("Contained {} top-level namespace(s):", ast.namespaces.len());
@@ -215,10 +231,7 @@ pub fn alfa_compile(
                 // policies, etc.
                 //ns.pretty_print(0);
                 //}
-                ast_collection.add_ast(AstSource {
-                    filename: asource.filename,
-                    ast,
-                });
+                ast_collection.add_ast(AstSource { src: alfasrc, ast });
             }
             Err(e) => {
                 if let ParseError::PestParseError(pe) = e {
@@ -306,6 +319,8 @@ pub fn alfa_compile(
 pub struct AlfaParseTree<'a> {
     /// Result of parsing an ALFA document with the pest grammar.
     pub pairs: Pairs<'a, Rule>,
+    /// File that contained the original ALFA document.
+    pub src: &'a NamedSource<String>,
     ctx: Rc<Context>,
 }
 
@@ -397,43 +412,58 @@ mod tests {
     #[test]
     fn test_nested_namespaces() {
         let input = "namespace main.foo { namespace bar { namespace baz.wham {} } }";
-        parse_alfadoc(input, Rc::default()).unwrap();
+        parse_alfadoc(
+            input,
+            &NamedSource::new("<default>", "".to_string()),
+            Rc::default(),
+        )
+        .unwrap();
     }
 
     #[test]
     fn test_no_leading_numeric_namespaces() {
         // leading number in a nested namespace
         let input = "namespace main.foo { namespace 9bar { namespace baz.wham {} } }";
-        let input_parsed = parse_alfadoc(input, Rc::default());
+        let nsrc = &NamedSource::new("<default>", input.to_string());
+        let input_parsed = parse_alfadoc(input, nsrc, Rc::default());
         assert!(input_parsed.is_err());
         // leading zero inside second component of a top-level namespace
         let input = "namespace main.0foo { namespace 9bar { namespace baz.wham {} } }";
-        let input_parsed = parse_alfadoc(input, Rc::default());
+        let nsrc = &NamedSource::new("<default>", input.to_string());
+        let input_parsed = parse_alfadoc(input, nsrc, Rc::default());
         assert!(input_parsed.is_err());
         // all numeric for top-level namespace
         let input = "namespace 444.foo { namespace 9bar { namespace baz.wham {} } }";
-        let input_parsed = parse_alfadoc(input, Rc::default());
+        let nsrc = &NamedSource::new("<default>", input.to_string());
+        let input_parsed = parse_alfadoc(input, nsrc, Rc::default());
         assert!(input_parsed.is_err());
         // leading empty namespace
         let input = "namespace .foo { namespace 9bar { namespace baz.wham {} } }";
-        let input_parsed = parse_alfadoc(input, Rc::default());
+        let nsrc = &NamedSource::new("<default>", input.to_string());
+
+        let input_parsed = parse_alfadoc(input, nsrc, Rc::default());
         assert!(input_parsed.is_err());
         // empty namespace
         let input = "namespace main..foo { namespace 9bar { namespace baz.wham {} } }";
-        let input_parsed = parse_alfadoc(input, Rc::default());
+        let nsrc = &NamedSource::new("<default>", input.to_string());
+
+        let input_parsed = parse_alfadoc(input, nsrc, Rc::default());
         assert!(input_parsed.is_err());
     }
 
     #[test]
     fn test_parse_alfadoc() {
         let input = "namespace foo { type string = \"foo\"}";
-        parse_alfadoc(input, Rc::default()).unwrap();
+        let nsrc = &NamedSource::new("<default>", input.to_string());
+        parse_alfadoc(input, nsrc, Rc::default()).unwrap();
     }
 
     /// Parse a document with a single namespace.
     #[test]
     fn test_parse_namespace() {
-        let ast = make_alfa_ast("namespace simple {}", Rc::default()).unwrap();
+        let input = "namespace simple {}";
+        let nsrc = &NamedSource::new("<default>", input.to_string());
+        let ast = make_alfa_ast(input, nsrc, Rc::default()).unwrap();
         let namespaces = ast.namespaces;
         // there is a single top-level namespace.
         assert!(namespaces.len() == 1);
@@ -446,7 +476,10 @@ mod tests {
     /// Parse a document with a single multi-component namespace.
     #[test]
     fn test_parse_multicomp_namespace() {
-        let ast = make_alfa_ast("namespace foo.bar {}", Rc::default()).unwrap();
+        let input = "namespace foo.bar {}";
+        let nsrc = &NamedSource::new("<default>", input.to_string());
+
+        let ast = make_alfa_ast(input, nsrc, Rc::default()).unwrap();
         let namespaces = ast.namespaces;
         // there is a single top-level namespace.
         assert!(namespaces.len() == 1);
@@ -463,7 +496,9 @@ mod tests {
     /// Parse a document with a nested namespace.
     #[test]
     fn test_parse_nested_namespace() {
-        let ast = make_alfa_ast("namespace foo { namespace bar {}}", Rc::default()).unwrap();
+        let input = "namespace foo { namespace bar {}}";
+        let nsrc = &NamedSource::new("<default>", input.to_string());
+        let ast = make_alfa_ast(input, nsrc, Rc::default()).unwrap();
         let namespaces = ast.namespaces;
         // there is a single top-level namespace.
         assert!(namespaces.len() == 1);
@@ -497,6 +532,7 @@ namespace main {
   }
 }
 "#,
+            &NamedSource::new("<default>", "".to_string()),
             Rc::default(),
         )
         .unwrap();
