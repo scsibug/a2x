@@ -4,8 +4,6 @@ namespace main {
   import attr.*
 
   // import entities by name
-  import oblig.verify_age
-  import oblig.record_txn_void
   import advice.clerk_assist
 
   /* Top-level policy to be used for our retail environment */
@@ -87,7 +85,7 @@ namespace main {
     // record information about the transaction voided.  Obligation
     // expressions with attribute designators as well as a literal value.
     on permit {
-      obligation record_txn_void {
+      obligation oblig.record_txn_void {
         currentTime = currentTime
         subjectId = subjectId
         transactionId = transactionId
@@ -102,7 +100,7 @@ namespace main {
     target clause ageRestrictedContents == true
     on permit {
       // require a clerk verify customer's age
-      obligation verify_age {}
+      obligation oblig.verify_age {}
     }
   }
 

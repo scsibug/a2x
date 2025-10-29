@@ -350,8 +350,8 @@ cond_argument_list = {
 // using the term "prescription" as a generic term to encompass advice and obligations.
 apply_prescription = { apply_advice | apply_obligation }
 // TODO: implement all the attribute definition stuff for advice & obligations.
-apply_advice = {"advice" ~ identifier ~ ("{" ~ prescription_assignment* ~ "}")?}
-apply_obligation = {"obligation" ~ identifier ~ ("{"  ~ prescription_assignment* ~ "}")?}
+apply_advice = {"advice" ~ elem_identifier ~ ("{" ~ prescription_assignment* ~ "}")?}
+apply_obligation = {"obligation" ~ elem_identifier ~ ("{"  ~ prescription_assignment* ~ "}")?}
 
 // prescription_assignment
 prescription_assignment = { elem_identifier ~ "=" ~ (literal | attribute_designator) }
