@@ -26,3 +26,4 @@ tasks:
   - test: |
       cd a2x
       cargo test --release
+      target/release/a2x -i samples -o xacml-gen
