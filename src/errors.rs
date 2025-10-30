@@ -12,7 +12,7 @@ use thiserror::Error;
 /// Error thrown when parsing fails.
 #[derive(Debug, Clone, Eq, PartialEq, Error, Diagnostic)]
 pub enum ParseError {
-    #[error("Pest parsing error: {}", _0)]
+    #[error("Parse error: {}", _0)]
     PestParseError(Box<pest::error::Error<Rule>>),
     #[error("Conversion into AST error")]
     AstConvertError,

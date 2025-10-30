@@ -235,10 +235,10 @@ pub fn alfa_compile(
             }
             Err(e) => {
                 if let ParseError::PestParseError(pe) = e {
-                    // TODO: cleanup
-                    // print out the inner parse error
-                    warn!("Parsing error at {pe}");
-                    return Err(ParseError::PestParseError(pe));
+                    // annotate with filename
+                    let ppe = pe.with_path(&asource.filename);
+                    warn!("Parsing error at {ppe}");
+                    return Err(ParseError::PestParseError(Box::new(ppe)));
                 }
                 warn!("Failed to parse document: {e:?}");
                 return Err(e);

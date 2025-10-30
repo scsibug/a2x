@@ -6,15 +6,14 @@ use a2x::context::Config;
 use a2x::context::Context;
 use a2x::AlfaFile;
 use clap::Parser;
-use log::info;
-use log::warn;
+use log::{info, warn};
+use miette::Report;
 use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::rc::Rc;
 use walkdir::WalkDir;
-use miette::Report;
 
 fn main() -> ExitCode {
     let args = CLIArgs::parse();
@@ -45,8 +44,19 @@ fn main() -> ExitCode {
         // check the result
         match xfilesres {
             Err(pe) => {
-                warn!("compilation failed");
+                warn!("compilation of ALFA sources failed: {:?}", pe);
                 eprintln!("Conversion to XACML Failed:");
+                // If we checked for a PestParseError, and converted
+                // the wrapped error using into_miette(), we could get
+                // consistent miette output.  But as of pest 2.8.3,
+                // the miette adapter does not preserve the path or
+                // position in the file (the message is correct; but
+                // the annotated line numbers always start at 0).
+                //match pe {
+                //    ParseError::PestParseError(ppe) => {
+                //        eprintln!("{:?}", Report::new(ppe.into_miette()));
+                //    } ...
+                //}
                 eprintln!("{:?}", Report::new(pe));
                 return ExitCode::FAILURE;
             }
