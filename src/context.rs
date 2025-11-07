@@ -24,9 +24,9 @@ use crate::ast::std_attributes::standard_attributes;
 use crate::ast::std_functions::standard_functions;
 use crate::ast::std_infix::standard_infix;
 use crate::ast::typedef::{standard_types, TypeDef};
-use crate::ast::AsAlfa;
+use crate::ast::{AsAlfa, SrcLoc};
 use crate::ast::QualifiedName;
-use crate::errors::ParseError;
+use crate::errors::{ParseError, SrcError};
 use log::debug;
 use log::info;
 use std::any::type_name;
@@ -374,8 +374,8 @@ where
     /// * `symbol` - A name exactly as it appears in the ALFA source
     ///   text, including namespace references.
     /// * `source_ns` - The namespace where the symbol was located.
+    /// * `src_loc` - Source of the symbol reference for error reporting.
     /// * `imports` - All import statements in effect where the symbol was used.
-    ///
     /// # Returns
     ///
     /// Reference-counted element found according to namespace
@@ -389,6 +389,7 @@ where
         &self,
         symbol: &str,
         source_ns: &[String],
+	src_loc: &SrcLoc,
         imports: Option<&Vec<Rc<Import>>>,
     ) -> Result<Rc<T>, ParseError> {
         info!(
@@ -450,10 +451,10 @@ where
         } else {
             debug!("There were no import statements, so this symbol could not be resolved");
         }
-        Err(ParseError::SymbolNotFound(
-            symbol.to_owned(),
-            source_ns.join("."),
-        ))
+	Err(SrcError::new(
+            "All referenced symbols must be defined",
+            &format!("this symbol could not be resolved"),
+            src_loc.clone()))
     }
 }
 
@@ -790,7 +791,7 @@ impl Context {
     ) -> Result<Rc<RuleCombinator>, ParseError> {
         info!("looking up rule combinator: symbol: {symbol:?}, source: {source_ns:?}");
         self.rulecombinator_resolver
-            .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref())
+            .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref())
     }
 
     /// Register policy combinator
@@ -816,6 +817,7 @@ impl Context {
         self.policycombinator_resolver.lookup(
             symbol,
             source_ns,
+	    &SrcLoc::default(),
             self.get_imports(source_ns).as_ref(),
         )
     }
@@ -840,7 +842,7 @@ impl Context {
         source_ns: &[String],
     ) -> Result<Rc<TypeDef>, ParseError> {
         self.typedef_resolver
-            .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref())
+            .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref())
     }
 
     /// Register function
@@ -863,7 +865,7 @@ impl Context {
         source_ns: &[String],
     ) -> Result<Rc<Function>, ParseError> {
         self.function_resolver
-            .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref())
+            .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref())
     }
 
     /// Register infix function
@@ -896,7 +898,7 @@ impl Context {
         source_ns: &[String],
     ) -> Result<Rc<AdviceDef>, ParseError> {
         self.advice_resolver
-            .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref())
+            .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref())
     }
 
     /// Register obligation
@@ -919,7 +921,7 @@ impl Context {
         source_ns: &[String],
     ) -> Result<Rc<ObligationDef>, ParseError> {
         self.obligation_resolver
-            .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref())
+            .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref())
     }
 
     /// Lookup infix function
@@ -934,7 +936,7 @@ impl Context {
         source_ns: &[String],
     ) -> Result<Rc<Infix>, ParseError> {
         self.infix_resolver
-            .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref())
+            .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref())
     }
 
     /// Lookup infix function by its inverse
@@ -955,13 +957,14 @@ impl Context {
         // first we lookup the regular symbol.
         let i =
             self.infix_resolver
-                .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref())?;
+                .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref())?;
         // Then, we get the inverse operator symbol, looking up from
         // the same location as where the original was defined.
         if let Some(inv_sym) = &i.inverse {
             Ok(self.infix_resolver.lookup(
                 inv_sym,
                 source_ns,
+		&SrcLoc::default(),
                 self.get_imports(source_ns).as_ref(),
             )?)
         } else {
@@ -1030,7 +1033,7 @@ impl Context {
     ) -> Result<Rc<PolicySet>, ParseError> {
         let p =
             self.policyset_resolver
-                .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref());
+                .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref());
         p
     }
 
@@ -1082,7 +1085,7 @@ impl Context {
         );
         let p =
             self.policy_resolver
-                .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref());
+                .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref());
         info!("finished policy resolver");
         p
     }
@@ -1105,9 +1108,10 @@ impl Context {
         &self,
         symbol: &str,
         source_ns: &[String],
+	src_loc: &SrcLoc,
     ) -> Result<Rc<RuleDef>, ParseError> {
         self.rule_resolver
-            .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref())
+            .lookup(symbol, source_ns, src_loc, self.get_imports(source_ns).as_ref())
     }
 
     /// Register attribute
@@ -1131,7 +1135,7 @@ impl Context {
         source_ns: &[String],
     ) -> Result<Rc<Attribute>, ParseError> {
         self.attribute_resolver
-            .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref())
+            .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref())
     }
 
     /// Register category
@@ -1155,7 +1159,7 @@ impl Context {
         source_ns: &[String],
     ) -> Result<Rc<Category>, ParseError> {
         self.category_resolver
-            .lookup(symbol, source_ns, self.get_imports(source_ns).as_ref())
+            .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref())
     }
 
     /// Convert a constant to a typed literal.  This may involve
@@ -1192,6 +1196,7 @@ impl Context {
                 let t = self.typedef_resolver.lookup(
                     &ct.name,
                     source_ns,
+		    &SrcLoc::default(),
                     self.get_imports(source_ns).as_ref(),
                 )?;
                 Ok(TypedLiteral {

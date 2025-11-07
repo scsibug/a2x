@@ -109,7 +109,7 @@ impl AlfaSyntaxTree {
 }
 
 /// Identify a specific location in a source tree.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SrcLoc {
     src: Arc<NamedSource<String>>,
     span: SourceSpan,
@@ -139,6 +139,16 @@ impl SrcLoc {
     }
     pub fn get_span(&self) -> SourceSpan {
         self.span.clone()
+    }
+
+    /// Define the span based on a start and end position in the source
+    pub fn with_start_end(&self, start_pos: usize, end_pos: usize) -> SrcLoc {
+	let mut s = SrcLoc {
+	    src: self.src.clone(),
+	    span: (start_pos, end_pos-start_pos).into()
+	};
+	s.trim_trailing_whitespace();
+	s
     }
 
     /// Replace the span with a new value
@@ -758,7 +768,7 @@ fn process_condition_expr_pair(
         }
     }
     Ok(CondExpressionUnparsed {
-        src_loc: src_loc.with_new_span((start_pos, end_pos - start_pos).into()),
+        src_loc: src_loc.with_start_end(start_pos, end_pos),
         items,
     })
 }
@@ -1454,7 +1464,7 @@ fn process_policyset(
         apply: apply.ok_or(SrcError::new(
             "PolicySets must have an apply statement",
             "missing an apply statement",
-            src_loc.with_new_span((start_pos, end_pos - start_pos).into()),
+	    src_loc.with_start_end(start_pos, end_pos)
         ))?,
         target,
         condition,
@@ -1633,9 +1643,17 @@ fn process_policy(
                 debug!("found rule reference {stmt:?}");
                 // a rule reference is just a bare (possibly qualified) name.
                 let (rule_ns, rule_id) = split_dotted_string(stmt.as_str());
+		// determine location
+		    // since this is a Pair, we can determine the start and end point.
+		let sp = stmt.as_span();
+		let start_pos = sp.start();
+		// default ending position
+		let end_pos = sp.end();
+		let new_src_loc = src_loc.with_new_span((start_pos, end_pos-start_pos).into());
                 let rule_ref = RuleReference {
                     id: rule_id,
                     ns: rule_ns,
+		    src_loc: new_src_loc,
                 };
                 rules.push(RuleEntry::Ref(rule_ref));
                 info!("finished pushing ruleentry ref");

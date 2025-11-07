@@ -1,6 +1,7 @@
 //  SPDX-FileCopyrightText: 2025 Greg Heartsfield <scsibug@imap.cc>
 //  SPDX-License-Identifier: GPL-3.0-or-later
 
+use super::SrcLoc;
 use super::condition::Condition;
 use super::naming::GenName;
 use super::prescription::Prescription;
@@ -150,6 +151,7 @@ impl PartialEq for RuleDef {
 pub struct RuleReference {
     pub id: String,
     pub ns: Vec<String>,
+    pub src_loc: SrcLoc,
 }
 
 impl QualifiedName for RuleDef {

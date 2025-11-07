@@ -128,10 +128,12 @@ impl TryFrom<&Policy> for XPolicy {
                     // lookup this rule
                     info!("trying to lookup....{}, from namespace {:?}", &rr.id, &p.ns);
                     // the above shows up we are NOT getting the full reference.
+		    // we need the source location of the rule.
                     let resolved_r = p.ctx.lookup_rule(
                         &rr.fully_qualified_name()
                             .ok_or(ParseError::AstConvertError)?,
                         &p.ns,
+			&rr.src_loc
                     )?;
                     // The Rule ID here needs to be made unique.  Only
                     // the Original RuleDef can use the rule path.
