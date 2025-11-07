@@ -27,6 +27,8 @@ pub mod std_infix;
 pub mod target;
 pub mod typedef;
 
+// Re-export the Spanned trait
+pub use a2x_derive::Spanned;
 use crate::ast::category::Category;
 use crate::ast::constant::{Constant, CustomType};
 use crate::ast::function::Function;
@@ -167,6 +169,16 @@ impl SrcLoc {
             self.span = (self.span.offset(), new_len).into();
         }
     }
+}
+
+/// Trait for AST elements that have source location information.
+///
+/// Types implementing this trait can provide their original source
+/// file and location.  This is used for error messages produced
+/// later.
+pub trait Spanned {
+    /// Returns a reference to the source location of this element.
+    fn span(&self) -> &SrcLoc;
 }
 
 // AlfaSyntaxTree implement TryFrom<AlfaParseTree> to create itself.

@@ -6,6 +6,7 @@ version = 4
 name = "a2x"
 version = "0.1.0"
 dependencies = [
+ "a2x-derive",
  "clap",
  "env_logger",
  "log",
@@ -19,6 +20,15 @@ dependencies = [
  "uuid",
  "walkdir",
  "xml",
+]
+
+[[package]]
+name = "a2x-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

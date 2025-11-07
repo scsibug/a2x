@@ -1,6 +1,7 @@
 use super::constant::Constant;
 use super::designator::AttributeDesignator;
 use super::operator::Operator;
+use super::Spanned;
 use super::{PrettyPrint, SrcLoc};
 use crate::errors::ParseError;
 use crate::Context;
@@ -16,7 +17,7 @@ use std::rc::Weak;
 // we should include a SourceSpan for error reporting
 
 /// A condition, with unparsed expressions
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Spanned)]
 pub struct Condition {
     /// conditions contain expressions, which can be nested, this form
     /// has no associativity applied.
@@ -123,7 +124,7 @@ impl TryFrom<&ConditionUnparsed> for Condition {
         Ok(Condition {
             cond_expr: CondExpression::try_from(&c.cond_expr)?,
             ns: c.ns.clone(),
-            src_loc: c.src_loc.clone(),
+            src_loc: c.span().clone(),
             ctx: c.ctx.clone(),
         })
     }
@@ -206,7 +207,7 @@ impl TryFrom<&CondFunctionCallUnparsed> for CondFunctionCall {
 // Then we convert into forms that have operator precedence applied.
 
 /// A condition, with unparsed expressions
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Spanned)]
 pub struct ConditionUnparsed {
     /// conditions contain expressions, which can be nested, this form
     /// has no associativity applied.
@@ -218,8 +219,6 @@ pub struct ConditionUnparsed {
     /// Context for conversion
     pub ctx: Weak<Context>,
 }
-
-//
 
 /// Unparsed expression
 #[derive(Debug, Default, Clone)]

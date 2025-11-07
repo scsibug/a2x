@@ -8,6 +8,7 @@ use super::xattr_designator::XAttrDesignator;
 use super::xexpression::XExpression;
 use super::xfunction::XFunction;
 use super::XAttrValue;
+use crate::ast::Spanned;
 use crate::ast::condition::{CondExpression, CondFunctionCall, Condition, FunctionReference};
 use crate::ast::constant::Constant;
 use crate::ast::designator::AttributeDesignator;
@@ -46,7 +47,7 @@ impl TryFrom<&Condition> for XCondition {
                 return Err(SrcError::new(
                     "Conditions must evaluate to booleans",
                     &format!("type is {:?}", n.uri),
-                    c.src_loc.clone(),
+                    c.span().clone(),
                 ));
             }
         } else {
@@ -55,7 +56,7 @@ impl TryFrom<&Condition> for XCondition {
             return Err(SrcError::new(
                 "Conditions must evaluate to atomic booleans",
                 "non-atomic type",
-                c.src_loc.clone(),
+                c.span().clone(),
             ));
         }
         // The ALFA spec seems to imply literals are not allowed, but
