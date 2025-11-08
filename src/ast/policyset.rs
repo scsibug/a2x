@@ -4,6 +4,8 @@
 use log::info;
 use uuid::Uuid;
 
+use super::Spanned;
+use super::SrcLoc;
 use super::condition::Condition;
 use super::naming::GenName;
 use super::naming::NameSlot;
@@ -16,6 +18,7 @@ use super::rule::RuleEntry;
 use super::target::Target;
 use super::PrettyPrint;
 use super::QualifiedName;
+use crate::ast::policy::RuleCombiningAlgorithm;
 use crate::context::PROTECTED_NS;
 use crate::Context;
 use crate::ParseError;
@@ -23,7 +26,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 /// An empty `PolicySet`.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Spanned)]
 pub struct PolicySet {
     /// The identifier for the policy
     pub id: PolicyId,
@@ -31,6 +34,8 @@ pub struct PolicySet {
     pub ns: Vec<String>,
     /// The policy parents (including this one), after any namespaces.
     pub policy_ns: GenName,
+    /// The location of this condition
+    pub src_loc: SrcLoc,
     /// Optional description
     pub description: Option<String>,
     /// Optional target
@@ -38,7 +43,7 @@ pub struct PolicySet {
     /// Optional condition
     pub condition: Option<Condition>,
     /// policy-combining algorithm symbol ("apply" statement)
-    pub apply: String,
+    pub apply: PolicyCombiningAlgorithm,
     /// policies or policysets within this policyset
     pub policies: Vec<PolicyEntry>,
     /// Obligations and/or advice
@@ -179,10 +184,11 @@ impl PolicySet {
             id: orig_id,
             ns: original.ns.clone(),
             policy_ns: self.policy_ns.clone(),
+	    src_loc: self.span().clone(),
             description: original.description.take(),
             target: None,
             condition: None,
-            apply: format!("{}.{}", PROTECTED_NS, "onPermitApplySecond"),
+            apply: PolicyCombiningAlgorithm { id: format!("{}.{}", PROTECTED_NS, "onPermitApplySecond"), src_loc: self.apply.span().clone() },
             policies: vec![],
             prescriptions: vec![],
             ctx: self.ctx.clone(),
@@ -229,10 +235,11 @@ impl PolicySet {
             id: cond_policy_id,
             ns: original.ns.clone(),
             policy_ns: cond_policy_ns,
+	    src_loc: self.span().clone(),
             description: None,
             target: None,
             condition: None,
-            apply: format!("{}.{}", PROTECTED_NS, "permitOverrides"),
+            apply: RuleCombiningAlgorithm { id: format!("{}.{}", PROTECTED_NS, "permitOverrides"), src_loc: self.apply.span().clone() },
             rules: vec![RuleEntry::Def(Rc::new(condrule))],
             prescriptions: vec![],
             ctx: self.ctx.clone(),
@@ -305,6 +312,18 @@ impl PrettyPrint for PolicySet {
     fn pretty_print(&self, indent_level: usize) {
         let indent = "  ".repeat(indent_level);
         println!("{indent}{self}");
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Spanned)]
+pub struct PolicyCombiningAlgorithm {
+    pub id: String,
+    pub src_loc: SrcLoc
+}
+
+impl fmt::Display for PolicyCombiningAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.id)
     }
 }
 

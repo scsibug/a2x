@@ -131,7 +131,7 @@ impl TryFrom<&PolicySet> for XPolicySet {
         // the rule combining algorithm needs to be resolved.
         let combining_alg = p
             .ctx
-            .lookup_policy_combinator(&p.apply, &p.ns)?
+            .lookup_policy_combinator(&p.apply.id, &p.ns)?
             .uri
             .to_string();
         info!("finished lookup of combining alg");

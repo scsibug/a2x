@@ -29,6 +29,7 @@ pub mod typedef;
 
 // Re-export the Spanned trait
 pub use a2x_derive::Spanned;
+use policyset::PolicyCombiningAlgorithm;
 use crate::ast::category::Category;
 use crate::ast::constant::{Constant, CustomType};
 use crate::ast::function::Function;
@@ -1472,12 +1473,13 @@ fn process_policyset(
         id: policy_id,
         ns: ns_path,
         policy_ns: parent_policy_path,
+	src_loc: src_loc.clone(), // TODO: ensure this covers the full span
         description,
-        apply: apply.ok_or(SrcError::new(
+        apply: PolicyCombiningAlgorithm { id: apply.ok_or(SrcError::new(
             "PolicySets must have an apply statement",
             "missing an apply statement",
 	    src_loc.with_start_end(start_pos, end_pos)
-        ))?,
+        ))?, src_loc: src_loc},
         target,
         condition,
         policies,
@@ -1498,6 +1500,8 @@ fn process_policy(
     let policy_id_rule = skip_comments(&mut policy_pairs).ok_or(ParseError::AstConvertError)?;
     // an apply statement is required.
     let mut apply = None;
+    // the apply will have a source location
+    let mut apply_srcloc = src_loc.clone();
     // a target is optional
     let mut target = None;
     // a condition is optional
@@ -1512,6 +1516,7 @@ fn process_policy(
     let sp = policy_id_rule.as_span();
     let start_pos = sp.start();
     let mut _end_pos = sp.end();
+    let policy_src_loc = src_loc.with_start_end(start_pos, _end_pos);
     // turn the policy_naming_rule into a PolicyId
     let policy_id = policy_naming(policy_id_rule, ctx.clone())?;
     // only register this policyset if it has a name, and the parent has a name.
@@ -1587,6 +1592,8 @@ fn process_policy(
             let stmt = skip_comments(&mut t).ok_or(ParseError::AstConvertError)?;
             // Apply statement
             if stmt.as_rule() == Rule::apply_stmt {
+		let apply_span = stmt.as_span();
+		apply_srcloc = apply_srcloc.with_start_end(apply_span.start(), apply_span.end());
                 // get inner
                 let mut apply_stmt = stmt.into_inner();
                 let apply_ident =
@@ -1687,12 +1694,14 @@ fn process_policy(
         id: policy_id,
         ns: ns_path,
         policy_ns: parent_policy_path,
+	src_loc: policy_src_loc.clone(),
         description,
-        apply: apply.ok_or(SrcError::new(
+        apply: policy::RuleCombiningAlgorithm {
+	    id: apply.ok_or(SrcError::new(
             "PolicySets must have an apply statement",
             "this policy needs an apply statement",
-            src_loc.with_new_span(start_pos.into()),
-        ))?,
+            policy_src_loc))?,
+	    src_loc: apply_srcloc},
         target,
         condition,
         rules,

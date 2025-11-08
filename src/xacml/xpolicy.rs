@@ -110,7 +110,7 @@ impl TryFrom<&Policy> for XPolicy {
         // the rule combining algorithm needs to be resolved.
         let combining_alg = p
             .ctx
-            .lookup_rule_combinator(&p.apply, &p.ns)?
+            .lookup_rule_combinator(&p.apply.id, &p.ns, &p.apply.src_loc)?
             .uri
             .to_string();
 

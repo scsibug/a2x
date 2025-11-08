@@ -397,6 +397,7 @@ where
             symbol,
             source_ns.join(".")
         );
+	let type_name = Resolver::<T>::short_type_name();
         // A symbol is the thing in the text, and may consist of dotted components (foo.bar).
         // The source_ns is where it was referenced.
         // imports are the set of import statements in effect where it was referenced.
@@ -449,11 +450,11 @@ where
                 return Ok(m);
             }
         } else {
-            debug!("There were no import statements, so this symbol could not be resolved");
+            debug!("There were no import statements, so this {type_name} could not be resolved");
         }
 	Err(SrcError::new(
             "All referenced symbols must be defined",
-            &format!("this symbol could not be resolved"),
+            &format!("this {type_name} could not be resolved"),
             src_loc.clone()))
     }
 }
@@ -788,10 +789,11 @@ impl Context {
         &self,
         symbol: &str,
         source_ns: &[String],
+	src_loc: &SrcLoc,
     ) -> Result<Rc<RuleCombinator>, ParseError> {
         info!("looking up rule combinator: symbol: {symbol:?}, source: {source_ns:?}");
         self.rulecombinator_resolver
-            .lookup(symbol, source_ns, &SrcLoc::default(), self.get_imports(source_ns).as_ref())
+            .lookup(symbol, source_ns, src_loc, self.get_imports(source_ns).as_ref())
     }
 
     /// Register policy combinator

@@ -1,6 +1,7 @@
 //  SPDX-FileCopyrightText: 2025 Greg Heartsfield <scsibug@imap.cc>
 //  SPDX-License-Identifier: GPL-3.0-or-later
 
+use super::{SrcLoc, Spanned};
 use super::condition::Condition;
 use super::naming::GenName;
 use super::naming::NameSlot;
@@ -10,7 +11,7 @@ use super::rule::RuleEntry;
 use super::target::Target;
 use super::PrettyPrint;
 use super::QualifiedName;
-use crate::ast::policyset::PolicyEntry;
+use crate::ast::policyset::{PolicyCombiningAlgorithm, PolicyEntry};
 use crate::ast::rule::Effect;
 use crate::ast::rule::RuleDef;
 use crate::context::PROTECTED_NS;
@@ -22,7 +23,7 @@ use std::fmt;
 use std::rc::Rc;
 use uuid::Uuid;
 /// An empty Policy.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Spanned)]
 pub struct Policy {
     /// The identifier for the policy
     pub id: PolicyId,
@@ -30,6 +31,8 @@ pub struct Policy {
     pub ns: Vec<String>,
     /// The policy parents within a namespace
     pub policy_ns: GenName,
+    /// The location of this condition
+    pub src_loc: SrcLoc,
     /// Optional description
     pub description: Option<String>,
     /// Optional target
@@ -37,13 +40,25 @@ pub struct Policy {
     /// Optional condition
     pub condition: Option<Condition>,
     /// rule-combining algorithm symbol ("apply" statement)
-    pub apply: String,
+    pub apply: RuleCombiningAlgorithm,
     /// Rules instantiated in the policy
     pub rules: Vec<RuleEntry>,
     /// On-Effect blocks (obligations/advice)
     pub prescriptions: Vec<Prescription>,
     /// Context for conversion
     pub ctx: Rc<Context>,
+}
+
+#[derive(Debug, PartialEq, Clone, Spanned)]
+pub struct RuleCombiningAlgorithm {
+    pub id: String,
+    pub src_loc: SrcLoc
+}
+
+impl fmt::Display for RuleCombiningAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.id)
+    }
 }
 
 /// Policy identifier
@@ -214,10 +229,11 @@ impl Policy {
             id: orig_id,
             ns: original.ns.clone(),
             policy_ns: self.policy_ns.clone(),
+	    src_loc: self.span().clone(),
             description: original.description.take(),
             target: None,
             condition: None,
-            apply: format!("{}.{}", PROTECTED_NS, "onPermitApplySecond"),
+            apply: PolicyCombiningAlgorithm {id: format!("{}.{}", PROTECTED_NS, "onPermitApplySecond"), src_loc: original.apply.span().clone()},
             policies: vec![],
             prescriptions: vec![],
             ctx: self.ctx.clone(),
@@ -251,10 +267,11 @@ impl Policy {
             id: cond_policy_id,
             ns: original.ns.clone(),
             policy_ns: cond_policy_ns,
+	    src_loc: self.span().clone(),
             description: None,
             target: None,
             condition: None,
-            apply: format!("{}.{}", PROTECTED_NS, "permitOverrides"),
+            apply: RuleCombiningAlgorithm { id: format!("{}.{}", PROTECTED_NS, "permitOverrides"), src_loc: self.apply.span().clone() },
             rules: vec![RuleEntry::Def(Rc::new(condrule))],
             prescriptions: vec![],
             ctx: self.ctx.clone(),
