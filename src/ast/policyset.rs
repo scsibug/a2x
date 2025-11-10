@@ -4,8 +4,6 @@
 use log::info;
 use uuid::Uuid;
 
-use super::Spanned;
-use super::SrcLoc;
 use super::condition::Condition;
 use super::naming::GenName;
 use super::naming::NameSlot;
@@ -18,6 +16,8 @@ use super::rule::RuleEntry;
 use super::target::Target;
 use super::PrettyPrint;
 use super::QualifiedName;
+use super::Spanned;
+use super::SrcLoc;
 use crate::ast::policy::RuleCombiningAlgorithm;
 use crate::context::PROTECTED_NS;
 use crate::Context;
@@ -184,11 +184,14 @@ impl PolicySet {
             id: orig_id,
             ns: original.ns.clone(),
             policy_ns: self.policy_ns.clone(),
-	    src_loc: self.span().clone(),
+            src_loc: self.span().clone(),
             description: original.description.take(),
             target: None,
             condition: None,
-            apply: PolicyCombiningAlgorithm { id: format!("{}.{}", PROTECTED_NS, "onPermitApplySecond"), src_loc: self.apply.span().clone() },
+            apply: PolicyCombiningAlgorithm {
+                id: format!("{}.{}", PROTECTED_NS, "onPermitApplySecond"),
+                src_loc: self.apply.span().clone(),
+            },
             policies: vec![],
             prescriptions: vec![],
             ctx: self.ctx.clone(),
@@ -235,11 +238,14 @@ impl PolicySet {
             id: cond_policy_id,
             ns: original.ns.clone(),
             policy_ns: cond_policy_ns,
-	    src_loc: self.span().clone(),
+            src_loc: self.span().clone(),
             description: None,
             target: None,
             condition: None,
-            apply: RuleCombiningAlgorithm { id: format!("{}.{}", PROTECTED_NS, "permitOverrides"), src_loc: self.apply.span().clone() },
+            apply: RuleCombiningAlgorithm {
+                id: format!("{}.{}", PROTECTED_NS, "permitOverrides"),
+                src_loc: self.apply.span().clone(),
+            },
             rules: vec![RuleEntry::Def(Rc::new(condrule))],
             prescriptions: vec![],
             ctx: self.ctx.clone(),
@@ -318,7 +324,7 @@ impl PrettyPrint for PolicySet {
 #[derive(Debug, PartialEq, Clone, Spanned)]
 pub struct PolicyCombiningAlgorithm {
     pub id: String,
-    pub src_loc: SrcLoc
+    pub src_loc: SrcLoc,
 }
 
 impl fmt::Display for PolicyCombiningAlgorithm {

@@ -28,8 +28,6 @@ pub mod target;
 pub mod typedef;
 
 // Re-export the Spanned trait
-pub use a2x_derive::Spanned;
-use policyset::PolicyCombiningAlgorithm;
 use crate::ast::category::Category;
 use crate::ast::constant::{Constant, CustomType};
 use crate::ast::function::Function;
@@ -57,6 +55,7 @@ use crate::errors::{ParseError, SrcError};
 use crate::AlfaParseTree;
 use crate::Context;
 use crate::Rule;
+pub use a2x_derive::Spanned;
 use advice::AdviceDef;
 use attribute::Attribute;
 use condition::{
@@ -69,6 +68,7 @@ use miette::{NamedSource, SourceCode, SourceSpan};
 use naming::GenName;
 use pest::iterators::Pair;
 use pest::iterators::Pairs;
+use policyset::PolicyCombiningAlgorithm;
 use prescription::{
     AttrAssignmentSource, AttributeAssignment, Prescription, PrescriptionExpr, PrescriptionType,
 };
@@ -146,12 +146,12 @@ impl SrcLoc {
 
     /// Define the span based on a start and end position in the source
     pub fn with_start_end(&self, start_pos: usize, end_pos: usize) -> SrcLoc {
-	let mut s = SrcLoc {
-	    src: self.src.clone(),
-	    span: (start_pos, end_pos-start_pos).into()
-	};
-	s.trim_trailing_whitespace();
-	s
+        let mut s = SrcLoc {
+            src: self.src.clone(),
+            span: (start_pos, end_pos - start_pos).into(),
+        };
+        s.trim_trailing_whitespace();
+        s
     }
 
     /// Replace the span with a new value
@@ -1473,13 +1473,16 @@ fn process_policyset(
         id: policy_id,
         ns: ns_path,
         policy_ns: parent_policy_path,
-	src_loc: src_loc.clone(), // TODO: ensure this covers the full span
+        src_loc: src_loc.clone(), // TODO: ensure this covers the full span
         description,
-        apply: PolicyCombiningAlgorithm { id: apply.ok_or(SrcError::new(
-            "PolicySets must have an apply statement",
-            "missing an apply statement",
-	    src_loc.with_start_end(start_pos, end_pos)
-        ))?, src_loc: src_loc},
+        apply: PolicyCombiningAlgorithm {
+            id: apply.ok_or(SrcError::new(
+                "PolicySets must have an apply statement",
+                "missing an apply statement",
+                src_loc.with_start_end(start_pos, end_pos),
+            ))?,
+            src_loc: src_loc,
+        },
         target,
         condition,
         policies,
@@ -1592,8 +1595,8 @@ fn process_policy(
             let stmt = skip_comments(&mut t).ok_or(ParseError::AstConvertError)?;
             // Apply statement
             if stmt.as_rule() == Rule::apply_stmt {
-		let apply_span = stmt.as_span();
-		apply_srcloc = apply_srcloc.with_start_end(apply_span.start(), apply_span.end());
+                let apply_span = stmt.as_span();
+                apply_srcloc = apply_srcloc.with_start_end(apply_span.start(), apply_span.end());
                 // get inner
                 let mut apply_stmt = stmt.into_inner();
                 let apply_ident =
@@ -1662,17 +1665,17 @@ fn process_policy(
                 debug!("found rule reference {stmt:?}");
                 // a rule reference is just a bare (possibly qualified) name.
                 let (rule_ns, rule_id) = split_dotted_string(stmt.as_str());
-		// determine location
-		    // since this is a Pair, we can determine the start and end point.
-		let sp = stmt.as_span();
-		let start_pos = sp.start();
-		// default ending position
-		let end_pos = sp.end();
-		let new_src_loc = src_loc.with_new_span((start_pos, end_pos-start_pos).into());
+                // determine location
+                // since this is a Pair, we can determine the start and end point.
+                let sp = stmt.as_span();
+                let start_pos = sp.start();
+                // default ending position
+                let end_pos = sp.end();
+                let new_src_loc = src_loc.with_new_span((start_pos, end_pos - start_pos).into());
                 let rule_ref = RuleReference {
                     id: rule_id,
                     ns: rule_ns,
-		    src_loc: new_src_loc,
+                    src_loc: new_src_loc,
                 };
                 rules.push(RuleEntry::Ref(rule_ref));
                 info!("finished pushing ruleentry ref");
@@ -1694,14 +1697,16 @@ fn process_policy(
         id: policy_id,
         ns: ns_path,
         policy_ns: parent_policy_path,
-	src_loc: policy_src_loc.clone(),
+        src_loc: policy_src_loc.clone(),
         description,
         apply: policy::RuleCombiningAlgorithm {
-	    id: apply.ok_or(SrcError::new(
-            "PolicySets must have an apply statement",
-            "this policy needs an apply statement",
-            policy_src_loc))?,
-	    src_loc: apply_srcloc},
+            id: apply.ok_or(SrcError::new(
+                "PolicySets must have an apply statement",
+                "this policy needs an apply statement",
+                policy_src_loc,
+            ))?,
+            src_loc: apply_srcloc,
+        },
         target,
         condition,
         rules,

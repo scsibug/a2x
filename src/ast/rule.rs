@@ -1,13 +1,13 @@
 //  SPDX-FileCopyrightText: 2025 Greg Heartsfield <scsibug@imap.cc>
 //  SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::SrcLoc;
 use super::condition::Condition;
 use super::naming::GenName;
 use super::prescription::Prescription;
 use super::target::Target;
 use super::PrettyPrint;
 use super::QualifiedName;
+use super::SrcLoc;
 use crate::Context;
 use log::warn;
 use std::fmt;
