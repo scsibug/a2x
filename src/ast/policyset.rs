@@ -374,7 +374,9 @@ impl PolicyReference {
     #[must_use]
     pub fn fully_qualified_name(&self) -> String {
         let mut fqname = self.ns.join(".");
-        fqname.push('.');
+        if fqname.len() > 0 {
+            fqname.push('.');
+        }
         fqname.push_str(&self.id);
         fqname
     }

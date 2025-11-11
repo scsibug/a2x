@@ -153,13 +153,13 @@ impl TryFrom<&PolicySet> for XPolicySet {
                     // (TODO) registration step should check and make
                     // sure there is no policy/policyset with the same
                     // name.
-
+                    debug!("lookup for policy ref: {pr:?}");
                     // lookup a policyset with this name.
-                    if let Ok(ps) = p.ctx.lookup_policyset(&pr.id, &p.ns) {
+                    if let Ok(ps) = p.ctx.lookup_policyset(&pr.fully_qualified_name(), &p.ns) {
                         // get the ID, and print it out.
                         info!("we found a policyset");
                         children.push(XPolicyEntry::PolicySetIdRef(ps.get_id()));
-                    } else if let Ok(ps) = p.ctx.lookup_policy(&pr.id, &p.ns) {
+                    } else if let Ok(ps) = p.ctx.lookup_policy(&pr.fully_qualified_name(), &p.ns) {
                         info!("we found a policy");
                         // if the policy has a condition, it will be
                         // transformed into a policyset, and we need

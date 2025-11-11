@@ -15,6 +15,7 @@ namespace main {
     customerAddToCart
     clerkAddToCart
     voidTransaction
+    common.deny
   }
 
   /* Prevent customers from performing any action outside of business hours */
