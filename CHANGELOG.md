@@ -1,3 +1,11 @@
+0.1.1
+======
+* Fix for resolving policy references within a policyset.
+* Minor improvements to some error messages to show filename/line
+  numbers and context.
+* Dependency updates.
+
+
 0.1.0
 ======
 This is the first public release of a2x.  It should be usable for

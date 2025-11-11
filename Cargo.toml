@@ -1,6 +1,6 @@
 [package]
 name = "a2x"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "GPL-3.0-or-later"
 homepage = "https://sr.ht/~gheartsfield/a2x/"
@@ -12,7 +12,7 @@ categories = ["command-line-utilities", "compilers"]
 exclude = [".build.yml", ".config"]
 
 [dependencies]
-a2x-derive = { path = "./a2x-derive" }
+a2x-derive = { path = "./a2x-derive", version  = "0.1.0" }
 clap = { version = "4.5", features = ["derive"] }
 env_logger = "0.11"
 log = "0.4"
