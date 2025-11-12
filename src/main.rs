@@ -111,7 +111,7 @@ fn main() -> ExitCode {
     eprintln!("Total time: {}", format_duration(program_start.elapsed()));
     eprintln!();
     eprintln!("✓ Conversion completed successfully");
-    return ExitCode::SUCCESS;
+    ExitCode::SUCCESS
 }
 
 /// Print the program name and version, with a header separator and whitespace.

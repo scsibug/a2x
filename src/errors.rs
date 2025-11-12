@@ -94,7 +94,7 @@ impl fmt::Display for SrcError {
 }
 
 impl SrcError {
-    pub fn new(msg: &str, label: &str, src_loc: SrcLoc) -> ParseError {
+    pub fn err(msg: &str, label: &str, src_loc: SrcLoc) -> ParseError {
         ParseError::SrcError(SrcError {
             src: src_loc.get_src(),
             labels: vec![LabeledSpan::new_with_span(

@@ -449,7 +449,7 @@ where
         } else {
             debug!("There were no import statements, so this {type_name} could not be resolved");
         }
-        Err(SrcError::new(
+        Err(SrcError::err(
             "All referenced symbols must be defined",
             &format!("this {type_name} could not be resolved"),
             src_loc.clone(),

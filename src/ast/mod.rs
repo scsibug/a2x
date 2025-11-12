@@ -141,7 +141,7 @@ impl SrcLoc {
         self.src.clone()
     }
     pub fn get_span(&self) -> SourceSpan {
-        self.span.clone()
+        self.span
     }
 
     /// Define the span based on a start and end position in the source
@@ -158,7 +158,7 @@ impl SrcLoc {
     pub fn with_new_span(&self, span: SourceSpan) -> SrcLoc {
         let mut s = SrcLoc {
             src: self.src.clone(),
-            span: span,
+            span,
         };
         s.trim_trailing_whitespace();
         s
@@ -720,7 +720,7 @@ fn process_condition(
     let cond_expr = process_condition_expr(cond_pairs, &src_loc, &ns)?;
     //let src_loc_new = src_loc.with_new_span(cond_expr.src_loc.span
     info!("cond-expr src_loc:  {:?}", cond_expr.src_loc);
-    let new_src_loc = src_loc.with_new_span(cond_expr.src_loc.span.clone());
+    let new_src_loc = src_loc.with_new_span(cond_expr.src_loc.span);
     let c = ConditionUnparsed {
         cond_expr,
         ns,
@@ -1476,12 +1476,12 @@ fn process_policyset(
         src_loc: src_loc.clone(), // TODO: ensure this covers the full span
         description,
         apply: PolicyCombiningAlgorithm {
-            id: apply.ok_or(SrcError::new(
+            id: apply.ok_or(SrcError::err(
                 "PolicySets must have an apply statement",
                 "missing an apply statement",
                 src_loc.with_start_end(start_pos, end_pos),
             ))?,
-            src_loc: src_loc,
+            src_loc,
         },
         target,
         condition,
@@ -1700,7 +1700,7 @@ fn process_policy(
         src_loc: policy_src_loc.clone(),
         description,
         apply: policy::RuleCombiningAlgorithm {
-            id: apply.ok_or(SrcError::new(
+            id: apply.ok_or(SrcError::err(
                 "PolicySets must have an apply statement",
                 "this policy needs an apply statement",
                 policy_src_loc,

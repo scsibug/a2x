@@ -46,7 +46,7 @@ impl TryFrom<&Condition> for XCondition {
             if n.uri != crate::ast::typedef::BOOLEAN_URI {
                 info!("The condition expression does not resolve to a boolean type");
                 info!("Observed type, atomic: {:?}", &n);
-                return Err(SrcError::new(
+                return Err(SrcError::err(
                     "Conditions must evaluate to booleans",
                     &format!("type is {:?}", n.uri),
                     c.span().clone(),
@@ -55,7 +55,7 @@ impl TryFrom<&Condition> for XCondition {
         } else {
             // If the type is not atomic, this is an error.
             info!("The condition expression does not resolve to an atomic type");
-            return Err(SrcError::new(
+            return Err(SrcError::err(
                 "Conditions must evaluate to atomic booleans",
                 "non-atomic type",
                 c.span().clone(),

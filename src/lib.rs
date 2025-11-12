@@ -235,7 +235,7 @@ pub fn alfa_compile(
             Ok(ast) => {
                 info!("Successfully parsed the document.");
                 info!("Contained {} top-level namespace(s):", ast.namespaces.len());
-                if ast.namespaces.len() > 0 {
+                if !ast.namespaces.is_empty() {
                     eprintln!("  ✓ {}", asource.filename);
                 } else {
                     eprintln!("  ⊘ {} (empty)", asource.filename);
