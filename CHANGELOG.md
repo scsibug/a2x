@@ -1,3 +1,7 @@
+TBR
+======
+* Fix for evaluating types of expressions in conditions.
+
 0.1.1
 ======
 * Fix for resolving policy references within a policyset.

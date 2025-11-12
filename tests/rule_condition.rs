@@ -196,6 +196,24 @@ namespace main {
     );
 }
 
+/// Condition with an infix function
+#[test]
+fn condition_infix_bool() {
+    let _x = compile_alfa_src(
+        r#"
+namespace main {
+  policy {
+    apply firstApplicable
+    rule {
+      permit
+      condition resourceId == stringBag("foo", "bar")
+    }
+  }
+}
+"#,
+    );
+}
+
 /// Condition with a function that does not resolve
 #[test]
 #[should_panic(expected = "compile failed")]

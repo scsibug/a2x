@@ -24,6 +24,7 @@ use log::info;
 use std::io::Write;
 use xml::writer::EventWriter;
 use xml::writer::XmlEvent;
+use std::fmt;
 
 /// A `<Condition>` element that contains an expression.
 #[derive(Debug, PartialEq, Clone)]
@@ -37,7 +38,8 @@ impl TryFrom<&Condition> for XCondition {
     fn try_from(c: &Condition) -> Result<Self, Self::Error> {
         let ctx = c.ctx.upgrade().ok_or(ParseError::ContextMissing)?;
         // Ensure the top-level type is an atomic boolean.
-        // if the expression has a symbol error (say, function not found), we just get None instead of the error.
+        // If the expression has a symbol error (say, function not
+        // found), we just get None instead of the error.
         let t = type_for_expr(&c.cond_expr, &c.ns, &ctx).ok();
         if let Some(FunctionTypeResolved::Atomic(n)) = t {
             // ensure boolean
@@ -106,14 +108,19 @@ fn type_for_expr(
                     Ok(FunctionTypeResolved::Atomic(ResolvedAtomicName {
                         uri: typedef.uri.clone(),
                     }))
-                }
-                // TODO: remaining types
-                // This would be helpful for troubleshooting.
-                x => {
-                    info!("type was {:?}", x);
-                    // TODO: produce a type name here, this isn't an error.
-                    Err(ParseError::AstConvertError)
-                }
+                },
+		FunctionOutputArg::AtomicBag(a) => {
+		    let typedef = ctx.lookup_type(a, &func.ns)?;
+                    Ok(FunctionTypeResolved::AtomicBag(ResolvedAtomicName {
+                        uri: typedef.uri.clone(),
+                    }))
+		},
+		FunctionOutputArg::AnyAtomic => {
+		    Ok(FunctionTypeResolved::AnyAtomic)
+		},
+		FunctionOutputArg::AnyAtomicBag => {
+		    Ok(FunctionTypeResolved::AnyAtomicBag)
+		}
             }
         }
         CondExpression::FnRef(fn_ref) => {
@@ -143,12 +150,14 @@ fn sig_and_type_for_infix(
     // lookup operation, using inverse as a fallback.
     // there is no point in looking up the inverse, because the user should be using the correct function.
     let infix = ctx.lookup_infix(&op.qualified_name(), source_ns)?;
-    info!("found operation:  {infix:?}");
+    info!("found operation:  {infix}");
     // lookup types of the arguments.  This currently only works for constants, but we will expand this.
     // get an expression for the first arg.
     // Determine type of first and second arguments
     let first_arg_type = type_for_expr(arg1, source_ns, ctx)?;
+    info!("first argument type is: {first_arg_type}");
     let second_arg_type = type_for_expr(arg2, source_ns, ctx)?;
+    info!("second argument type is: {second_arg_type}");
     // Lookup a signature for our infix operator which is compatible.
     let mut op_fn_sig = None;
     for s in &infix.signatures {
@@ -446,6 +455,25 @@ impl FunctionTypeResolved {
     #[must_use]
     pub fn is_atomic(&self) -> bool {
         !self.is_bag()
+    }
+}
+
+impl fmt::Display for FunctionTypeResolved {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+	match self {
+	    FunctionTypeResolved::Atomic(an) => {
+		write!(f, "fn arg atomic type: {}", an.uri)
+	    },
+	    FunctionTypeResolved::AtomicBag(ab) => {
+		write!(f, "fn arg type: Bag[{}]", ab.uri)
+	    },
+	    FunctionTypeResolved::AnyAtomicBag => {
+		write!(f, "fn arg: any atomic bag")
+	    },
+	    FunctionTypeResolved::AnyAtomic => {
+		write!(f, "fn arg: any atomic")
+	    }
+	}
     }
 }
 
