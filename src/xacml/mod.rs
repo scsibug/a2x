@@ -48,3 +48,44 @@ pub enum XTopPolicy {
     Policy(XPolicy),
     PolicySet(XPolicySet),
 }
+
+impl XTopPolicy {
+    /// Count the total number of rules defined in this policy/set and
+    /// its children.
+    pub fn rule_count(&self) -> usize {
+        match self {
+            XTopPolicy::Policy(xp) => {
+                xp.rule_count()
+            },
+            XTopPolicy::PolicySet(xps) => {
+                xps.rule_count()
+            }
+        }
+    }
+    /// Count the total number of policies defined in this policy/set
+    /// and its children.
+    pub fn policy_count(&self) -> usize {
+        match self {
+            XTopPolicy::Policy(_) => {
+                1
+            },
+            XTopPolicy::PolicySet(xps) => {
+                xps.policy_count()
+            }
+        }
+    }
+
+    /// Count the total number of policysets defined in this
+    /// policy/set and its children.
+    pub fn policyset_count(&self) -> usize {
+        match self {
+            XTopPolicy::Policy(_) => {
+                0
+            },
+            XTopPolicy::PolicySet(xps) => {
+                // count this policyset and its children
+                1 + xps.policyset_count()
+            }
+        }
+    }
+}

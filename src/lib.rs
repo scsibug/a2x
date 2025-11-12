@@ -149,11 +149,16 @@ pub struct XacmlFile {
 /// An `Err` is returned if the individual policy file cannot be
 /// created or written to.
 ///
+/// # Returns
+/// Returns a `Result` containing:
+/// * `Ok(AlfaSyntaxTree)` - Successfully parsed policy combined with `ctx` object
+/// * `Err(ParseError)` - Parse error if the policy string contains invalid syntax
+///
 /// # Panics
 ///
 /// A panic occurs if the target directory cannot be created, or if
 /// there are any errors serializing XML.
-pub fn write_xentry(dir: &Path, p: &XTopPolicy) -> Result<(), ParseError> {
+pub fn write_xentry(dir: &Path, p: &XTopPolicy) -> Result<String, ParseError> {
     // ensure directory exists
     std::fs::create_dir_all(dir).expect("could not create directory");
     match p {
@@ -163,12 +168,15 @@ pub fn write_xentry(dir: &Path, p: &XTopPolicy) -> Result<(), ParseError> {
                 .filename
                 .as_ref()
                 .ok_or(ParseError::XacmlMissingFilename)?;
-            let buffer = File::create(dir.join(output_filename))
+            let full_path = dir.join(output_filename);
+            let buffer = File::create(&full_path)
                 .map_err(|_x| ParseError::XacmlWriteIoError)?;
             let mut writer = EmitterConfig::new()
                 .perform_indent(true)
                 .create_writer(buffer);
             xps.write_xml(&mut writer).expect("unable to write");
+                Ok(full_path.to_str().unwrap_or("<unknown>").to_owned())
+
         }
         XTopPolicy::Policy(xp) => {
             info!("found xpolicy");
@@ -176,15 +184,16 @@ pub fn write_xentry(dir: &Path, p: &XTopPolicy) -> Result<(), ParseError> {
                 .filename
                 .as_ref()
                 .ok_or(ParseError::XacmlMissingFilename)?;
-            let buffer = File::create(dir.join(output_filename))
+            let full_path = dir.join(output_filename);
+            let buffer = File::create(&full_path)
                 .map_err(|_x| ParseError::XacmlWriteIoError)?;
             let mut writer = EmitterConfig::new()
                 .perform_indent(true)
                 .create_writer(buffer);
             xp.write_xml(&mut writer).expect("unable to write");
+            Ok(full_path.to_str().unwrap_or("<unknown>").to_owned())
         }
-    }
-    Ok(())
+   }
 }
 
 // Simpler method for integration tests, take Alfa Sources, and convert to XACML types, but do not serialize.
@@ -214,6 +223,7 @@ pub fn alfa_compile(
     info!("compiling...");
     let mut ast_collection = AstCollection::new(ctx.clone());
     // alfa ast conversion
+    eprintln!("Parsing ALFA policies:");
     for asource in alfa_sources {
         info!("== {:?} ==", asource.filename);
         let filename = asource.filename.to_string();
@@ -225,12 +235,12 @@ pub fn alfa_compile(
             Ok(ast) => {
                 info!("Successfully parsed the document.");
                 info!("Contained {} top-level namespace(s):", ast.namespaces.len());
-                //for ns in &ast.namespaces {
-                // print all the top-level namespaces, and
-                // recursively all the child members such as
-                // policies, etc.
-                //ns.pretty_print(0);
-                //}
+                if ast.namespaces.len() > 0 {
+                    eprintln!("  ✓ {}", asource.filename);
+                } else {
+                    eprintln!("  ⊘ {} (empty)", asource.filename);
+                }
+
                 ast_collection.add_ast(AstSource { src: alfasrc, ast });
             }
             Err(e) => {

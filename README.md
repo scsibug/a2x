@@ -37,6 +37,56 @@ disabled with the ```--disable-builtins``` flag.
 The default prefix for `PolicySetId`, `PolicyId`, and `RuleId` can be
 customized with the ```--namespace``` option.
 
+
+
+### Sample Policy
+
+A [sample policy](samples/retail/README.md) is included in this
+repository, which may be helpful as a reference for ALFA language
+features, and a known working example for running `a2x`.
+
+Convert the sample to XACML:
+
+```
+$ a2x -i samples -o xacml-gen
+
+ALFA to XACML Converter v0.1.1
+==============================
+
+Input:  samples
+Output: xacml-gen
+
+Scanning input directory...
+Found 5 ALFA policy files
+
+Parsing ALFA policies:
+  ✓ samples/retail/attr.alfa
+  ✓ samples/retail/oblig.alfa
+  ✓ samples/retail/common.alfa
+  ✓ samples/retail/main.alfa
+  ⊘ samples/retail/empty.alfa (empty)
+
+Writing XACML policies:
+  ✓ xacml-gen/main.retail.xml
+  ✓ xacml-gen/common.deny.xml
+  ✓ xacml-gen/main.customerBusinessHours.xml
+  ✓ xacml-gen/main.customerAddToCart.xml
+  ✓ xacml-gen/main.clerkAddToCart.xml
+  ✓ xacml-gen/main.voidTransaction.xml
+
+Summary:
+--------
+ALFA files processed  : 5
+XACML files generated : 6
+Policy Sets written   : 3
+Policies written      : 7
+Rules written         : 9
+
+Total time: 4.1ms
+
+✓ Conversion completed successfully
+```
+
 ### Building
 
 a2x is written in Rust, so you will need to [install
@@ -62,12 +112,6 @@ To run all these tests, use:
 ```
 $ cargo test
 ```
-
-### Sample ALFA policy
-
-A [sample policy](samples/retail/README.md) is included in this
-repository, which may be helpful as a reference for ALFA language
-features, and a known working example for running `a2x`.
 
 ### References
 

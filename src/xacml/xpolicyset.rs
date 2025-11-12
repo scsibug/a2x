@@ -31,6 +31,33 @@ pub struct XPolicySet {
     pub children: Vec<XPolicyEntry>,
 }
 
+impl XPolicySet {
+    /// Count the total number of rules defined under this policyset.
+    pub fn rule_count(&self) -> usize {
+        let mut count = 0;
+        for p in &self.children {
+            count += p.rule_count();
+        }
+        count
+    }
+    /// Count the total number of policies defined under this policyset.
+    pub fn policy_count(&self) -> usize {
+        let mut count = 0;
+        for p in &self.children {
+            count += p.policy_count();
+        }
+        count
+    }
+    /// Count the total number of policysets defined under this policyset.
+    pub fn policyset_count(&self) -> usize {
+        let mut count = 0;
+        for p in &self.children {
+            count += p.policyset_count();
+        }
+        count
+    }
+}
+
 impl XacmlWriter for XPolicySet {
     /// Write an XML (XACML) representation of an `XPolicySet` to a
     /// stream.

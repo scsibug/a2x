@@ -32,6 +32,14 @@ pub struct XPolicy {
     pub rules: Vec<XRule>,
 }
 
+impl XPolicy {
+    /// Count the total number of rules defined under this policy.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+
 // this is a nice structure in that the event writer can be passed along for serialization.
 impl XacmlWriter for XPolicy {
     /// Write an XML (XACML) representation of an `XPolicy` to a

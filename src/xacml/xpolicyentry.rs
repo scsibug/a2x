@@ -18,6 +18,39 @@ pub enum XPolicyEntry {
     Policy(XPolicy),
 }
 
+impl XPolicyEntry {
+    /// Count the total number of rules contained under this policy
+    /// entry.
+    pub fn rule_count(&self) -> usize {
+        match &self {
+            XPolicyEntry::PolicyIdRef(_) => { 0 }
+            XPolicyEntry::PolicySetIdRef(_) => { 0 }
+            XPolicyEntry::PolicySet(p) => { p.rule_count() },
+            XPolicyEntry::Policy(p)=> { p.rule_count() },
+        }
+    }
+    /// Count the total number of policies contained under this policy
+    /// entry, not including policy references.
+    pub fn policy_count(&self) -> usize {
+        match &self {
+            XPolicyEntry::PolicyIdRef(_) => { 0 }
+            XPolicyEntry::PolicySetIdRef(_) => { 0 }
+            XPolicyEntry::PolicySet(p) => { p.policy_count() },
+            XPolicyEntry::Policy(_)=> { 1 },
+        }
+    }
+    /// Count the total number of policysets contained under this policy
+    /// entry, not including policyset references.
+    pub fn policyset_count(&self) -> usize {
+        match &self {
+            XPolicyEntry::PolicyIdRef(_) => { 0 }
+            XPolicyEntry::PolicySetIdRef(_) => { 0 }
+            XPolicyEntry::PolicySet(p) => { p.policyset_count() },
+            XPolicyEntry::Policy(_)=> { 0 },
+        }
+    }
+}
+
 /// Convert a policy into either a policyset or policy, depending on
 /// whether a condition is present.
 impl TryFrom<&Policy> for XPolicyEntry {
